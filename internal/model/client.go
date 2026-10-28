@@ -63,6 +63,19 @@ func (s Settings) validate() error {
 	return nil
 }
 
+// NewClient builds the shared Eino model adapter for chat and Agent use.
+func NewClient(ctx context.Context, cfg Settings) (*openai.ChatModel, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+	maxTokens := 256
+	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, MaxCompletionTokens: &maxTokens})
+	if err != nil {
+		return nil, fmt.Errorf("create model: %w", ErrProvider)
+	}
+	return client, nil
+}
+
 // StreamText exercises the real Eino adapter without implementing retries or routing.
 func StreamText(ctx context.Context, cfg Settings, prompt string, output io.Writer) error {
 	if strings.TrimSpace(prompt) == "" {
@@ -73,10 +86,9 @@ func StreamText(ctx context.Context, cfg Settings, prompt string, output io.Writ
 	}
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	maxTokens := 256
-	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, MaxCompletionTokens: &maxTokens})
+	client, err := NewClient(ctx, cfg)
 	if err != nil {
-		return fmt.Errorf("create model: %w", ErrProvider)
+		return err
 	}
 	stream, err := client.Stream(ctx, []*schema.Message{schema.UserMessage(prompt)})
 	if err != nil {
