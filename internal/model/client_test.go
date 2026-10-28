@@ -216,3 +216,13 @@ func TestStreamTextEmptyAndOutputFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestNewClientValidatesSettings(t *testing.T) {
+	if _, err := NewClient(context.Background(), Settings{}); err == nil {
+		t.Fatal("invalid client settings accepted")
+	}
+	cfg := Settings{BaseURL: "http://127.0.0.1:12345/v1", Model: "test", APIKey: "test", Timeout: time.Second}
+	if _, err := NewClient(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+}
