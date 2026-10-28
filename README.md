@@ -2,7 +2,9 @@
 
 基于 Go + Eino 的 Agentic RAG 学习项目。当前包含第一课 HTTP 底座/模型验证，以及第二课 Eino ADK 只读订单 Agent。
 
-课程文档：`/Users/admin/workspace/docs/studyroom/ragent-go/lessons/01-project-bootstrap.md`。
+课程入口：[学习目录](docs/README.md)、[40 节主课路线](docs/ROADMAP.md)、[项目设计](docs/PROJECT.md)。
+
+已开课程：[第 01 课：工程底座](docs/lessons/01-project-bootstrap.md)、[第 02 课：工具型 Agent](docs/lessons/02-agent-and-tools.md)。文档实际保存在项目 docs/，与代码共同提交，克隆即可阅读。
 
 ## 当前能力
 
@@ -81,4 +83,4 @@ make agentcheck
 
 可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
 
-本课要求订单查询有工具执行与结果证据，模型直接给答案时返回错误而不展示为成功；这不能证明模型最终表述与证据完全一致，答案忠实性与效果评估会继续建设。完整讲解见第二课文档。
+本课要求订单查询有工具执行与结果证据，模型直接给答案时返回错误而不展示为成功；这不能证明模型最终表述与证据完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
