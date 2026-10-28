@@ -1,6 +1,10 @@
 # Ragent Go
 
-基于 Go + Eino 的 Agentic RAG 学习项目。当前包含第一课 HTTP 底座/模型验证，以及第二课 Eino ADK 只读订单 Agent。
+基于 **Go、Gin 和 Eino** 的 Agentic RAG 工程实践项目。参考 [Ragent](https://github.com/nageoffer/ragent) 的能力与设计，面向 Go 开发者，通过逐课实现、源码导读、测试和故障实验，逐步建设完整的企业级 AI 应用平台。
+
+项目按 [40 节主课](docs/ROADMAP.md) 推进，目标覆盖知识入库、混合检索、RAG、Agent 工具调用、MCP、Skills、会话与长期记忆、人工确认、权限隔离、可观测性和部署验收。**当前完成前两课的代码与本地验证，仍处于持续开发阶段。**
+
+这是独立的 Go 学习与实现项目，与参考项目不存在官方隶属关系。已实现能力和后续计划分别记录在下方及课程路线中。
 
 课程入口：[学习目录](docs/README.md)、[40 节主课路线](docs/ROADMAP.md)、[项目设计](docs/PROJECT.md)。
 
@@ -19,14 +23,18 @@ HTTP 服务目前仅提供健康检查，订单 Agent 通过独立 CLI 演示。
 
 ## 工具链与依赖
 
-本机 Go 1.27.3 已安装到用户级公共目录 `/Users/admin/.local/share/go/1.27.3`，命令入口为 `/Users/admin/.local/bin/go` 与 `gofmt`，所有项目可直接调用。Makefile 默认使用 PATH 中的 `go`，不再依赖项目 `.tools`。其他机器可安装兼容 Go，或使用 `make GO=/absolute/path/to/go ...`。HTTP 框架 Gin v1.12.0；核心 Eino v0.9.22、模型扩展 v0.1.13，完整依赖记录在 go.mod/go.sum。
+当前验证环境为 Go 1.27.3（macOS arm64），`go.mod` 记录工具链要求。Makefile 默认使用 PATH 中的 `go`，也可用 `make GO=/absolute/path/to/go ...` 指定。HTTP 框架 Gin v1.12.0；Eino 核心 v0.9.22、模型扩展 v0.1.13，完整依赖记录在 go.mod/go.sum。
+
+当前 Sonic v1.15.0 在 Go 1.27 下会提示回退到标准库 JSON；现有测试与模型文本调用通过，尚未验证优化路径性能。我们自己的业务 JSON 默认使用 `encoding/json`。
 
 Makefile 的构建与模块缓存放在项目 `.cache/`，不修改全局 Go 配置。首次下载使用可达的模块代理；例如本机验证使用 `GOPROXY=https://goproxy.cn`。不关闭校验数据库。
 
 ## 运行
 
 ```sh
-cd /Users/admin/workspace/ragent-go
+git clone git@github.com:yangs08/ragent-go.git
+cd ragent-go
+cp .env.example .env
 make run
 ```
 
@@ -38,7 +46,7 @@ curl -i http://127.0.0.1:8080/healthz
 
 按 Ctrl+C 正常退出。启动时读取当前工作目录的 `.env`；本地开发从项目根目录运行。优先级：系统环境变量 > `.env` > 程序默认值。文件不存在时可使用环境变量和默认值，格式/读取错误会在启动时报错。配置说明见 configs/README.md。
 
-已创建本机 `.env`（不入版本控制），默认可启动 HTTP 服务；编辑该文件即可调整端口和模型配置。`.env.example` 为无凭据模板，新检出项目且尚无 `.env` 时再复制模板。
+首次克隆时复制 `.env.example` 到 `.env`，默认配置即可启动健康检查。已有 `.env` 时请保留，不要覆盖。模型相关配置留空，使用模型命令前再填写自己的服务信息。真实 `.env` 不入版本控制。
 
 ## 检查
 
@@ -51,13 +59,13 @@ make smoke
 
 `make smoke` 需要 Python 3 标准库，启动本地临时端口和本地模拟供应商，验证三个已构建进程；不访问付费模型。
 
-## 真实模型联调（尚未执行）
+## 真实模型联调
 
 在项目根目录 `.env` 填写 `RAGENT_MODEL_BASE_URL`、`RAGENT_MODEL_NAME`、`RAGENT_MODEL_API_KEY` 后运行 `make modelcheck`。可选 `RAGENT_MODEL_TIMEOUT`（默认 20s）和 `RAGENT_MODEL_PROMPT`。Base URL 使用供应商指定的兼容接口根路径，例如以 `/v1` 结尾的地址；不要填完整 `/chat/completions`。
 
-真实凭据只保存在被 Git 忽略的本机 `.env` 或安全运行环境中，不写入示例、文档或命令历史。该命令会实际调用配置的服务，可能产生用量费用，本轮未执行。
+真实凭据只保存在被 Git 忽略的本机 `.env` 或安全运行环境中，不写入示例、文档或命令历史。该命令会实际调用配置的服务，可能产生用量费用。开发阶段已验证一次真实文本调用；自动化测试和冒烟只使用本地模拟服务。
 
-当前模型验证只消费文本；工具调用、思考字段、多模态、用量汇总与供应商差异属于后续实现范围。
+`modelcheck` 只消费文本；工具循环请使用第二课的 `agentcheck`。思考字段、多模态、用量汇总与完整供应商兼容性仍属后续范围。
 
 ## HTTP 框架边界
 
@@ -84,3 +92,20 @@ make agentcheck
 可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
 
 本课要求订单查询有工具执行与结果证据，模型直接给答案时返回错误而不展示为成功；这不能证明模型最终表述与证据完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
+
+## 项目结构
+
+```text
+cmd/           server、modelcheck、agentcheck 命令入口
+internal/      HTTP、配置、模型、Agent 与受控工具实现
+configs/       配置字段说明
+scripts/       本地进程冒烟验证
+docs/          项目设计、40 节路线、逐课讲解与验收记录
+```
+
+## 参考与学习方式
+
+- [Ragent](https://github.com/nageoffer/ragent)：业务能力与 Java 源码参考。
+- [Eino](https://github.com/cloudwego/eino)：Go AI 组件与 Agent 执行框架。
+- 每课先明确业务与边界，再实现和测试；实际结果、限制和提交记录同步写入 docs/。
+- 当前没有完整生产认证、持久会话、知识索引或管理后台，上线能力以各阶段验收证据为准。
