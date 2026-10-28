@@ -69,7 +69,7 @@ func NewClient(ctx context.Context, cfg Settings) (*openai.ChatModel, error) {
 		return nil, err
 	}
 	maxTokens := 256
-	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, MaxCompletionTokens: &maxTokens})
+	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Timeout: cfg.Timeout, MaxCompletionTokens: &maxTokens})
 	if err != nil {
 		return nil, fmt.Errorf("create model: %w", ErrProvider)
 	}

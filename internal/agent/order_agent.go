@@ -46,8 +46,8 @@ func NewOrderAgent(model einomodel.BaseChatModel, store tooling.OrderStore, prin
 	if model == nil {
 		return nil, errors.New("agent model is required")
 	}
-	if options.MaxIterations < 1 || options.MaxIterations > 20 || options.MaxToolCalls < 1 || options.MaxToolCalls > 20 || options.Timeout <= 0 || options.Timeout > 5*time.Minute {
-		return nil, errors.New("agent requires 1..20 iterations, 1..20 tool calls, and a timeout in (0,5m]")
+	if err := options.validate(); err != nil {
+		return nil, err
 	}
 	orderTool, err := tooling.NewOrderTool(store, principal)
 	if err != nil {

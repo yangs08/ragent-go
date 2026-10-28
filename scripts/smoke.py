@@ -69,8 +69,20 @@ def check(workdir):
     requests = []
     class Provider(BaseHTTPRequestHandler):
         def do_POST(self):
-            requests.append((self.path, self.headers.get("Authorization"),
-                             json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            requests.append((self.path, self.headers.get("Authorization"), body))
+            if not body.get("stream"):
+                if body["messages"][-1]["role"] == "tool":
+                    message = {"role": "assistant", "content": "A100 已发货"}
+                    finish = "stop"
+                else:
+                    message = {"role": "assistant", "tool_calls": [{"id": "smoke-order-call", "type": "function", "function": {"name": "get_order", "arguments": '{"order_id":"A100"}'}}]}
+                    finish = "tool_calls"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"choices": [{"index": 0, "message": message, "finish_reason": finish}]}).encode())
+                return
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
@@ -96,6 +108,20 @@ def check(workdir):
         assert path == "/v1/chat/completions" and auth == "Bearer local-test-key"
         assert body["stream"] is True and body["model"] == "smoke-model"
         assert body["messages"][0]["content"] == "local smoke test"
+        agent_check = subprocess.run([str(ROOT / "bin/agentcheck")], env=model_env, cwd=workdir,
+                                     capture_output=True, text=True, timeout=5)
+        assert agent_check.returncode == 0, agent_check.stderr
+        events = [json.loads(line) for line in agent_check.stdout.splitlines()]
+        assert [event["type"] for event in events] == ["tool_call", "tool_result", "answer"]
+        assert events[0]["tool_call_id"] == events[1]["tool_call_id"] == "smoke-order-call"
+        assert events[1]["result"]["code"] == "ok"
+        assert events[1]["result"]["order"]["status"] == "shipped"
+        assert events[2]["content"] == "A100 已发货"
+        assert len(requests) == 3
+        second_model_input = requests[2][2]["messages"][-1]
+        assert second_model_input["role"] == "tool" and second_model_input["tool_call_id"] == "smoke-order-call"
+        assert json.loads(second_model_input["content"])["code"] == "ok"
+        print("PASS: agentcheck process -> ADK -> get_order -> correlated tool result -> answer")
     finally:
         provider.shutdown()
         provider.server_close()

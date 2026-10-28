@@ -1,6 +1,6 @@
 # Ragent Go
 
-基于 Go + Eino 的 Agentic RAG 学习项目。当前为第一课工程：HTTP 启动底座与独立模型验证命令。
+基于 Go + Eino 的 Agentic RAG 学习项目。当前包含第一课 HTTP 底座/模型验证，以及第二课 Eino ADK 只读订单 Agent。
 
 课程文档：`/Users/admin/workspace/docs/studyroom/ragent-go/lessons/01-project-bootstrap.md`。
 
@@ -13,7 +13,7 @@
 - Eino 真实适配器的独立模型验证命令，包含流式消费、整体超时和取消。
 - 本地模拟供应商集成测试，不需要真实 API Key。
 
-HTTP 服务目前仅提供健康检查。没有认证、聊天 API、持久会话或 Agent，尚不能部署为企业平台；后续按课程添加。
+HTTP 服务目前仅提供健康检查，订单 Agent 通过独立 CLI 演示。尚无正式认证、聊天 API、持久会话和管理后台，后续按课程添加。
 
 ## 工具链与依赖
 
@@ -47,7 +47,7 @@ make verify-modules
 make smoke
 ```
 
-`make smoke` 需要 Python 3 标准库，启动本地临时端口和本地模拟供应商，验证两个已构建进程；不访问付费模型。
+`make smoke` 需要 Python 3 标准库，启动本地临时端口和本地模拟供应商，验证三个已构建进程；不访问付费模型。
 
 ## 真实模型联调（尚未执行）
 
@@ -66,3 +66,19 @@ Gin 负责路由与中间件，作为 http.Handler 交给现有 http.Server。�
 GET/HEAD /healthz 返回 200；HEAD 无正文；POST 返回 405 和 Allow；/healthz/ 返回 404，不自动重定向。JSON 响应继续使用 encoding/json，没有启用额外 JSON 替换构建参数。
 
 panic 在响应尚未提交时返回脱敏 500；响应已提交则保留已发送状态与内容、记录恢复事件，不能把部分输出伪装成完整成功。panic 的测试路径只存在于测试，不在服务开放。
+
+## 第二课：只读订单 Agent
+
+在现有 .env 配置的模型支持工具调用时执行：
+
+```sh
+make agentcheck
+```
+
+该命令会真实调用已配置服务，通常包含多次模型请求，可能产生用量；本课自动化验证只访问本地模拟服务。事件按 JSONL 输出：tool_call、tool_result、answer。当前按完整消息显示步骤，不是逐 Token 输出，也不是已经实现 HTTP SSE。
+
+模拟身份固定为租户 acme / 用户 alice：A100=shipped，A101=delivered；B200 属于其他用户，C300 属于其他租户，对当前身份均返回 not_found。没有真实写操作、真实业务订单或生产登录认证。
+
+可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
+
+本课要求订单查询有工具执行与结果证据，模型直接给答案时返回错误而不展示为成功；这不能证明模型最终表述与证据完全一致，答案忠实性与效果评估会继续建设。完整讲解见第二课文档。
