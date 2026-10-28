@@ -226,3 +226,18 @@ func TestNewClientValidatesSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNewClientHonorsTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.Copy(io.Discard, r.Body); <-r.Context().Done() }))
+	defer server.Close()
+	client, err := NewClient(context.Background(), Settings{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: 30 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = client.Generate(ctx, nil)
+	if err == nil || ctx.Err() != nil {
+		t.Fatalf("configured client timeout not honored before outer deadline: %v", err)
+	}
+}
