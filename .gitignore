@@ -1,0 +1,11 @@
+.tools/
+.cache/
+bin/
+.env
+.env.*
+!.env.example
+coverage.out
+.idea/
+.DS_Store
+__pycache__/
+*.pyc
