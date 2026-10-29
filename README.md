@@ -111,3 +111,16 @@ docs/          项目设计、40 节路线、逐课讲解与验收记录
 - [Eino](https://github.com/cloudwego/eino)：Go AI 组件与 Agent 执行框架。
 - 每课先明确业务与边界，再实现和测试；实际结果、限制和提交记录同步写入 docs/。
 - 当前没有完整生产认证、持久会话、知识索引或管理后台，上线能力以各阶段验收证据为准。
+
+## 第四课：PostgreSQL + GORM
+
+本地数据库与其他项目隔离，默认 127.0.0.1:15432。设置 .env 中 RAGENT_DB_ENABLED=true 与独立随机密码后执行：
+
+```sh
+make db-up
+make migrate
+make migrate-status
+make dbcheck
+```
+
+使用独立 SQL 迁移，不在应用启动时 AutoMigrate。当前本机连接、重复迁移、事务回滚与数据库启用后的服务退出已验证。数据库健康不是 /healthz 的检查内容，登录与会话业务仍待实现。详见 [第四课](docs/lessons/04-postgresql-and-migrations.md)。

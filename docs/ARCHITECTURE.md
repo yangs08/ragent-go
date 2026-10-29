@@ -48,7 +48,7 @@ Agent 包不强制所有任务必须登录；访问用户数据的工具在调�
 
 ## 当前限制与下一阶段
 
-只有 /healthz HTTP 路由。聊天、认证、会话历史、数据库、主动停止、SSE 协议和跨实例治理尚未实现。第一版接口按 Ragent：GET /agent/v1/chat、POST /agent/v1/stop，断线取消，不自动重连。
+只有 /healthz HTTP 路由。聊天、认证、会话历史、业务会话表、主动停止、SSE 协议和跨实例治理尚未实现。第一版接口按 Ragent：GET /agent/v1/chat、POST /agent/v1/stop，断线取消，不自动重连。
 
 优先实现真实调用链，再建立有实际用途的抽象；不预建 Service 容器、动态工具目录或租户系统。测试聚焦身份隔离、越权、取消与预算，不为目录与简单传参堆测试。
 
@@ -59,3 +59,7 @@ Agent 包不强制所有任务必须登录；访问用户数据的工具在调�
 HTTP 入口统一使用 handler，不保留 transport/http 两级结构；用户上下文是 common/user.go 中的简单辅助函数，不单列业务模块。common 仅放实际共享的小型基础类型/函数，不集中业务逻辑或全局可变状态。
 
 service 用于后续聊天与会话业务流程；当前尚无这条业务链，暂不建立空目录。Handler 负责协议与输入，Service 协调业务，Agent 负责 Eino 执行；示例工具只依赖 common 中的标准 context 辅助函数，不依赖 Gin。
+
+## 第 04 课数据库接入
+
+新增 internal/database 的 GORM 连接初始化，配置仍在统一 config.Database 中；migrations 保存独立版本 SQL，cmd/migrate 显式执行，不由 HTTP 启动自动改表。数据库已验证，登录、会话与聊天 Service 尚未实现。详见 [第四课](lessons/04-postgresql-and-migrations.md)。

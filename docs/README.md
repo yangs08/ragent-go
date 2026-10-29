@@ -46,3 +46,5 @@
 - [第 03 课补充实践：收敛 Agent 与用户上下文](lessons/03d-agent-user-context.md)（当前架构）
 
 - [接口文件与 SSE 帧说明](../api/README.md)
+
+- [第 04 课：PostgreSQL、GORM 与数据库迁移](lessons/04-postgresql-and-migrations.md)（本机验证完成）

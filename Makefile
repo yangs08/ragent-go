@@ -17,6 +17,8 @@ build:
 	$(GO) build -o bin/server ./cmd/server
 	$(GO) build -o bin/modelcheck ./cmd/modelcheck
 	$(GO) build -o bin/agentcheck ./cmd/agentcheck
+	$(GO) build -o bin/migrate ./cmd/migrate
+	$(GO) build -o bin/dbcheck ./cmd/dbcheck
 
 fmt:
 	$(GO) fmt ./...
@@ -32,3 +34,19 @@ smoke: build
 
 agentcheck:
 	$(GO) run ./cmd/agentcheck
+
+.PHONY: db-up db-stop migrate migrate-status dbcheck
+db-up:
+	docker compose --env-file .env -f deploy/compose.yaml up -d --wait postgres
+
+db-stop:
+	docker compose --env-file .env -f deploy/compose.yaml stop postgres
+
+migrate:
+	$(GO) run ./cmd/migrate -command up
+
+migrate-status:
+	$(GO) run ./cmd/migrate -command status
+
+dbcheck:
+	$(GO) run ./cmd/dbcheck

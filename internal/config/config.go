@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig
-	Model  ModelConfig
-	Agent  AgentConfig
+	Server   ServerConfig
+	Model    ModelConfig
+	Agent    AgentConfig
+	Database DatabaseConfig
 }
 
 type ServerConfig struct {
@@ -64,5 +65,9 @@ func Load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Server: server, Model: model, Agent: agent}, nil
+	database, err := loadDatabase(getenv)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{Server: server, Model: model, Agent: agent, Database: database}, nil
 }

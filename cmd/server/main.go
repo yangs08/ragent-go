@@ -13,6 +13,7 @@ import (
 
 	"ragent-go/internal/bootstrap"
 	"ragent-go/internal/config"
+	"ragent-go/internal/database"
 	"ragent-go/internal/handler"
 )
 
@@ -41,6 +42,18 @@ func runServer(ctx context.Context, getenv func(string) string, output io.Writer
 		return err
 	}
 	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: cfg.Server.LogLevel}))
+	if cfg.Database.Enabled {
+		db, err := database.Open(ctx, cfg.Database)
+		if err != nil {
+			return err
+		}
+		pool, err := db.DB()
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
+		logger.Info("database connected")
+	}
 	listener, err := net.Listen("tcp", cfg.Server.HTTPAddr)
 	if err != nil {
 		return err

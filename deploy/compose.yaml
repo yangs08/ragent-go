@@ -1,0 +1,20 @@
+name: ragent-go-study
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RAGENT_DB_NAME:-ragent_go}
+      POSTGRES_USER: ${RAGENT_DB_USER:-ragent}
+      POSTGRES_PASSWORD: ${RAGENT_DB_PASSWORD:?set RAGENT_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${RAGENT_DB_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres_data:

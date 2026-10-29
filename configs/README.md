@@ -44,3 +44,19 @@ RAGENT_MODEL_TIMEOUT 是单次模型 HTTP 请求的超时；整次任务可能�
 统一加载入口为 internal/config.Load，配置分 Server、Model、Agent；组件接收配置值，不自行读取环境。当前健康服务允许模型三项全部为空；部分配置则必须完整合法。模型命令始终要求完整模型配置。所有配置段均在统一 Load 时检查。
 
 RAGENT_MODEL_MAX_COMPLETION_TOKENS：回答 token 上限，正整数，默认 256。按模型支持与回答长度调整；不修改已有真实 .env。
+
+## PostgreSQL
+
+统一字段 config.Database。模板默认 RAGENT_DB_ENABLED=false，仅健康检查时不依赖数据库。启用后启动失败即停止，不自动忽略数据库错误。
+
+| 字段 | 默认值 |
+|---|---|
+| RAGENT_DB_HOST / PORT | 127.0.0.1 / 15432 |
+| RAGENT_DB_NAME / USER | ragent_go / ragent |
+| RAGENT_DB_PASSWORD | 无；启用时必填，禁止提交 |
+| RAGENT_DB_SSLMODE | disable；仅回环允许，远程要求 verify-full |
+| RAGENT_DB_MAX_OPEN_CONNS / MAX_IDLE_CONNS | 10 / 5 |
+| RAGENT_DB_CONNECT_TIMEOUT | 5s |
+| RAGENT_DB_CONN_MAX_LIFETIME / CONN_MAX_IDLE_TIME | 30m / 5m |
+
+make db-up 通过 .env 取得专属本地容器参数；不要输出 docker compose config，避免将展开后的密码打印到日志。数据库迁移与事务实验见第四课。
