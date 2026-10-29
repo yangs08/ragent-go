@@ -26,7 +26,7 @@ func main() {
 }
 
 func runCheck(ctx context.Context, getenv func(string) string, output io.Writer) error {
-	cfg, err := model.LoadSettings(getenv)
+	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
 	}
@@ -34,5 +34,5 @@ func runCheck(ctx context.Context, getenv func(string) string, output io.Writer)
 	if prompt == "" {
 		prompt = "请用一句话解释什么是 Agent。"
 	}
-	return model.StreamText(ctx, cfg, prompt, output)
+	return model.StreamText(ctx, cfg.Model, prompt, output)
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	"ragent-go/internal/config"
 	"ragent-go/internal/tooling"
 )
 
@@ -28,7 +29,7 @@ type providerRequest struct {
 	} `json:"messages"`
 }
 
-func newTestAgent(t *testing.T, handler http.HandlerFunc, options Options) (*OrderAgent, *atomic.Int32) {
+func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentConfig) (*OrderAgent, *atomic.Int32) {
 	t.Helper()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,9 @@ func newTestAgent(t *testing.T, handler http.HandlerFunc, options Options) (*Ord
 	}
 	return agent, &calls
 }
-func testOptions() Options { return Options{MaxIterations: 4, MaxToolCalls: 3, Timeout: time.Second} }
+func testOptions() config.AgentConfig {
+	return config.AgentConfig{MaxIterations: 4, MaxToolCalls: 3, Timeout: time.Second}
+}
 func toolResponse(w http.ResponseWriter, args string) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"id": "test-response", "object": "chat.completion", "choices": []any{map[string]any{"index": 0, "finish_reason": "tool_calls", "message": map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "call-order", "type": "function", "function": map[string]any{"name": "get_order", "arguments": args}}}}}}})
@@ -207,7 +210,7 @@ func TestOrderAgentInputAndOutputErrors(t *testing.T) {
 	if _, err := NewOrderAgent(nil, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, testOptions()); err == nil {
 		t.Fatal("nil model accepted")
 	}
-	for _, opts := range []Options{{}, {MaxIterations: 21, MaxToolCalls: 3, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 21, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 3, Timeout: 6 * time.Minute}} {
+	for _, opts := range []config.AgentConfig{{}, {MaxIterations: 21, MaxToolCalls: 3, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 21, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 3, Timeout: 6 * time.Minute}} {
 		if _, err := NewOrderAgent(agent.model, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, opts); err == nil {
 			t.Fatal("invalid options accepted")
 		}

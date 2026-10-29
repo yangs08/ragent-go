@@ -1,11 +1,11 @@
-package agent
+package config
 
 import (
 	"testing"
 	"time"
 )
 
-func TestLoadOptions(t *testing.T) {
+func TestLoadAgent(t *testing.T) {
 	for _, tt := range []struct {
 		name, key, value string
 		invalid          bool
@@ -21,7 +21,7 @@ func TestLoadOptions(t *testing.T) {
 		{name: "zero timeout", key: "RAGENT_AGENT_TIMEOUT", value: "0s", invalid: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			opts, err := LoadOptions(func(k string) string {
+			opts, err := loadAgent(func(k string) string {
 				if k == tt.key {
 					return tt.value
 				}

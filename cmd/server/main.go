@@ -40,13 +40,13 @@ func runServer(ctx context.Context, getenv func(string) string, output io.Writer
 	if err != nil {
 		return err
 	}
-	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: cfg.LogLevel}))
-	listener, err := net.Listen("tcp", cfg.HTTPAddr)
+	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: cfg.Server.LogLevel}))
+	listener, err := net.Listen("tcp", cfg.Server.HTTPAddr)
 	if err != nil {
 		return err
 	}
 	logger.Info("server started", "address", listener.Addr().String())
-	err = bootstrap.Serve(ctx, listener, httptransport.NewHandler(logger), cfg.ShutdownTimeout)
+	err = bootstrap.Serve(ctx, listener, httptransport.NewHandler(logger), cfg.Server.ShutdownTimeout)
 	if err == nil {
 		logger.Info("server stopped gracefully")
 	}

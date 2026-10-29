@@ -30,20 +30,16 @@ func main() {
 }
 
 func runOrderCheck(ctx context.Context, getenv func(string) string, output io.Writer) error {
-	settings, err := model.LoadSettings(getenv)
+	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
 	}
-	options, err := agent.LoadOptions(getenv)
-	if err != nil {
-		return err
-	}
-	client, err := model.NewClient(ctx, settings)
+	client, err := model.NewClient(ctx, cfg.Model)
 	if err != nil {
 		return err
 	}
 	// The CLI demonstrates one trusted identity. Production authentication comes later.
-	orderAgent, err := agent.NewOrderAgent(client, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, options)
+	orderAgent, err := agent.NewOrderAgent(client, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, cfg.Agent)
 	if err != nil {
 		return err
 	}

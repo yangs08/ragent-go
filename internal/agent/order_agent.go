@@ -6,13 +6,13 @@ import (
 	"errors"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/cloudwego/eino/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"ragent-go/internal/config"
 	"ragent-go/internal/tooling"
 )
 
@@ -20,12 +20,6 @@ var ErrRunFailed = errors.New("agent execution failed; check provider tool suppo
 var ErrNoToolEvidence = errors.New("agent answered without order query evidence")
 var ErrNoAnswer = errors.New("agent returned no final text answer")
 var ErrToolBudget = errors.New("agent tool call budget exhausted")
-
-type Options struct {
-	MaxIterations int
-	MaxToolCalls  int
-	Timeout       time.Duration
-}
 
 type Event struct {
 	Type    string               `json:"type"`
@@ -42,14 +36,14 @@ type EventSink func(Event) error
 type OrderAgent struct {
 	model     einomodel.BaseChatModel
 	orderTool tool.InvokableTool
-	options   Options
+	options   config.AgentConfig
 }
 
-func NewOrderAgent(model einomodel.BaseChatModel, store tooling.OrderStore, principal tooling.Principal, options Options) (*OrderAgent, error) {
+func NewOrderAgent(model einomodel.BaseChatModel, store tooling.OrderStore, principal tooling.Principal, options config.AgentConfig) (*OrderAgent, error) {
 	if model == nil {
 		return nil, errors.New("agent model is required")
 	}
-	if err := options.validate(); err != nil {
+	if err := options.Validate(); err != nil {
 		return nil, err
 	}
 	orderTool, err := tooling.NewOrderTool(store, principal)

@@ -52,13 +52,19 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadUnifiedConfig(t *testing.T) {
- env := map[string]string{
- "RAGENT_MODEL_BASE_URL":"https://model.example/v1", "RAGENT_MODEL_NAME":"test", "RAGENT_MODEL_API_KEY":"test-key",
- "RAGENT_AGENT_MAX_ITERATIONS":"6", "RAGENT_AGENT_TIMEOUT":"2s",
- }
- cfg, err := Load(func(k string) string { return env[k] })
- if err != nil { t.Fatal(err) }
- if cfg.Model.Model != "test" || cfg.Model.Timeout != 20*time.Second || cfg.Agent.MaxIterations != 6 || cfg.Agent.Timeout != 2*time.Second { t.Fatal("unified config not loaded") }
- env["RAGENT_AGENT_TIMEOUT"] = "bad"
- if _, err := Load(func(k string) string { return env[k] }); err == nil { t.Fatal("invalid agent config accepted") }
+	env := map[string]string{
+		"RAGENT_MODEL_BASE_URL": "https://model.example/v1", "RAGENT_MODEL_NAME": "test", "RAGENT_MODEL_API_KEY": "test-key",
+		"RAGENT_AGENT_MAX_ITERATIONS": "6", "RAGENT_AGENT_TIMEOUT": "2s",
+	}
+	cfg, err := Load(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Model.Model != "test" || cfg.Model.Timeout != 20*time.Second || cfg.Agent.MaxIterations != 6 || cfg.Agent.Timeout != 2*time.Second {
+		t.Fatal("unified config not loaded")
+	}
+	env["RAGENT_AGENT_TIMEOUT"] = "bad"
+	if _, err := Load(func(k string) string { return env[k] }); err == nil {
+		t.Fatal("invalid agent config accepted")
+	}
 }
