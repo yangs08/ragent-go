@@ -37,7 +37,7 @@ Base URL 禁止内嵌凭据、查询参数或 fragment。该命令仅用于开�
 | RAGENT_AGENT_MAX_TOOL_CALLS | 3 | 实际工具执行次数预算，1..20，每次运行独立 |
 | RAGENT_AGENT_TIMEOUT | 30s | 整次任务截止时间，(0,5m] |
 
-RAGENT_MODEL_TIMEOUT 是单次模型 HTTP 请求的超时；整次任务可能多次调用模型，所以另设任务超时。示例身份固定在程序中，模型参数只接受 order_id，不能切换租户或用户。
+RAGENT_MODEL_TIMEOUT 是单次模型 HTTP 请求的超时；整次任务可能多次调用模型，所以另设任务超时。CLI 通过 context 注入开发用户 alice；工具调用时读取本次用户，模型参数只接受 order_id，不能指定身份。
 
 ## 统一配置结构
 

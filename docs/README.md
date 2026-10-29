@@ -42,3 +42,5 @@
 - [第 03 课补充实践：统一应用配置](lessons/03b-unified-config.md)
 
 - [第 03 课补充实践：应用架构综合整改](lessons/03c-architecture-refactor.md)
+
+- [第 03 课补充实践：收敛 Agent 与用户上下文](lessons/03d-agent-user-context.md)（当前架构）

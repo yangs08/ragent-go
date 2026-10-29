@@ -87,7 +87,7 @@ make agentcheck
 
 该命令会真实调用已配置服务，通常包含多次模型请求，可能产生用量；本课自动化验证只访问本地模拟服务。事件按 JSONL 输出：tool_call、tool_result、answer。当前按完整消息显示步骤，不是逐 Token 输出，也不是已经实现 HTTP SSE。
 
-模拟身份固定为租户 acme / 用户 alice：A100=shipped，A101=delivered；B200 属于其他用户，C300 属于其他租户，对当前身份均返回 not_found。没有真实写操作、真实业务订单或生产登录认证。
+开发用户由 CLI 注入为 alice：A100=shipped，A101=delivered；B200 和 C300 属于其他用户，对当前身份均返回 not_found。没有真实写操作、真实业务订单或生产登录认证。
 
 可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
 

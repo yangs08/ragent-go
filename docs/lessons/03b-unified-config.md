@@ -1,5 +1,8 @@
 # 第 03 课补充实践：统一应用配置
 
+> 历史阶段记录：后续已简化 Agent、身份与工具组织，当前代码以 [03d](03d-agent-user-context.md) 和 [架构基线](../ARCHITECTURE.md) 为准。
+
+
 ## 目标与 Ragent 对照
 
 配置来源、默认值、解析和合法性校验由 internal/config 统一管理。Ragent 使用 Spring 将配置段绑定到 AgentProperties 等类型，再注入组件。Go 版本使用启动层加载与构造函数传参：同样集中管理、按模块分组，不复制 Spring 容器。

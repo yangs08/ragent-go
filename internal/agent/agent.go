@@ -10,7 +10,9 @@ import (
 	"github.com/cloudwego/eino/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+
 	"ragent-go/internal/config"
 )
 
@@ -30,51 +32,41 @@ type Event struct {
 // this execution. Run never invokes the sink after returning.
 type EventSink func(Event) error
 
-type Executor struct {
+type Agent struct {
 	model      einomodel.BaseChatModel
-	catalog    ToolCatalog
+	tools      []tool.InvokableTool
 	definition Definition
-	options    config.AgentConfig
+	cfg        config.AgentConfig
 }
 
-func NewExecutor(model einomodel.BaseChatModel, catalog ToolCatalog, definition Definition, options config.AgentConfig) (*Executor, error) {
-	if model == nil || catalog == nil {
-		return nil, errors.New("agent model and tool catalog are required")
+func New(model einomodel.BaseChatModel, tools []tool.InvokableTool, definition Definition, cfg config.AgentConfig) (*Agent, error) {
+	if model == nil {
+		return nil, errors.New("agent model is required")
 	}
-	if err := options.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(definition.Name) == "" || strings.TrimSpace(definition.Instruction) == "" {
 		return nil, errors.New("agent name and instruction are required")
 	}
-	return &Executor{model: model, catalog: catalog, definition: definition, options: options}, nil
+	return &Agent{model: model, tools: append([]tool.InvokableTool(nil), tools...), definition: definition, cfg: cfg}, nil
 }
 
 // Run uses ADK for the decision/action loop and emits typed events.
 // The constructor is reusable; all mutable execution state is local to this run.
-func (a *Executor) Run(ctx context.Context, request Request, emit EventSink) error {
-	if strings.TrimSpace(request.Question) == "" || emit == nil {
+func (a *Agent) Run(ctx context.Context, question string, emit EventSink) error {
+	if strings.TrimSpace(question) == "" || emit == nil {
 		return errors.New("agent question and event sink are required")
 	}
-	if err := request.Principal.Validate(); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(ctx, a.options.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	resolved, err := a.catalog.Resolve(ctx, request.Principal)
-	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return ErrRunFailed
-	}
-	budget := &toolBudget{limit: int32(a.options.MaxToolCalls)}
-	tools := make([]tool.BaseTool, 0, len(resolved))
-	names := make(map[string]bool, len(resolved))
-	for _, t := range resolved {
+	budget := &toolBudget{limit: int32(a.cfg.MaxToolCalls)}
+	tools := make([]tool.BaseTool, 0, len(a.tools))
+	names := make(map[string]bool, len(a.tools))
+	for _, t := range a.tools {
 		if t == nil {
 			return ErrRunFailed
 		}
@@ -85,12 +77,12 @@ func (a *Executor) Run(ctx context.Context, request Request, emit EventSink) err
 		names[info.Name] = true
 		tools = append(tools, &budgetedTool{InvokableTool: t, budget: budget})
 	}
-	engine, err := buildEngine(ctx, a.model, a.definition, tools, a.options)
+	engine, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{Name: a.definition.Name, Description: a.definition.Description, Instruction: a.definition.Instruction, Model: a.model, MaxIterations: a.cfg.MaxIterations, ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: tools}}})
 	if err != nil {
 		return a.safeError(ctx, budget)
 	}
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: engine, EnableStreaming: false})
-	events := runner.Query(ctx, request.Question)
+	events := runner.Query(ctx, question)
 	pending := make(map[string]string)
 	answer := ""
 	for {
@@ -164,7 +156,7 @@ func (a *Executor) Run(ctx context.Context, request Request, emit EventSink) err
 	return emit(Event{Type: "answer", Content: answer})
 }
 
-func (a *Executor) safeError(ctx context.Context, budget *toolBudget) error {
+func (a *Agent) safeError(ctx context.Context, budget *toolBudget) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -193,4 +185,10 @@ func (t *budgetedTool) InvokableRun(ctx context.Context, args string, options ..
 		return "", ErrToolBudget
 	}
 	return t.InvokableTool.InvokableRun(ctx, args, options...)
+}
+
+// Definition is a server-controlled profile, not request or model input.
+type Definition struct {
+	Name, Description, Instruction string
+	ExposeToolResults              bool
 }

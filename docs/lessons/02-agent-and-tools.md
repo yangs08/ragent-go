@@ -91,7 +91,7 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 | 已知订单 | 实际执行工具并根据固定结果回答 | 本地验证通过 |
 | 不存在的订单 | 返回明确业务结果，不虚构订单 | 本地验证通过 |
 | 参数缺失/非法/未知字段 | 在业务执行前拒绝无效输入 | 本地验证通过 |
-| 模拟主体访问不属于自己的订单 | 工具端拒绝，模型不能通过改参数越权 | 本地验证通过 |
+| 模拟主体访问不属于自己的订单 | 查询逻辑拒绝，模型不能通过改参数越权 | 本地验证通过 |
 | 工具失败 | 结果可区分、错误不泄露内部信息 | 本地验证通过 |
 | 调用与结果匹配 | 关联同一个 tool_call_id | 本地验证通过 |
 | 超时、取消与轮数耗尽 | 能终止，没有无限工具循环 | 本地验证通过 |
@@ -114,25 +114,20 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 ## 9. 实际新增的模块与阅读顺序
 
 ```text
-internal/bootstrap/agent.go    开发环境显式装配
-internal/agent/provider.go     Agent 定义与 Eino 装配
-internal/agent/executor.go     通用运行、事件与共享预算
-internal/tooling/catalog.go    本轮工具注册与身份绑定
-internal/tooling/order.go      订单工具 Schema 与参数适配
-internal/order/service.go      订单业务、授权、Repository
-internal/devdata/orders.go     开发数据适配器
-internal/identity/principal.go 可信执行主体
-internal/config/agent.go       集中管理的执行配置
-cmd/agentcheck/                诊断入口与 JSONL 输出
+cmd/agentcheck/main.go         配置、模型、工具装配和 CLI 输出
+internal/agent/agent.go        Agent 定义、通用运行、事件与预算
+internal/usercontext/user.go  当前请求用户的 context 存取
+internal/example/order.go     示例订单工具与本地数据
+internal/config/agent.go      集中管理的执行配置
 ```
 
-按装配 → 执行 → 工具 → 业务 → 仓储的顺序阅读，完整解释见第三课综合整改实践。
+顺序阅读入口装配 → Agent 执行 → 示例工具 → 用户上下文。详见 [当前收敛实践](03d-agent-user-context.md)。
 
 ### 为什么身份不放在 Tool Schema 中
 
-模型可以自行生成工具参数。如果工具允许模型指定 tenant_id 或 user_id，相当于把资源访问范围交给不可信输入。当前程序固定演示主体为租户 acme、用户 alice；工具仅接受 order_id。后续接入登录认证时，用已认证主体替换演示主体，继续维持这个边界。
+模型可以自行生成工具参数。如果工具允许模型指定 tenant_id 或 user_id，相当于把资源访问范围交给不可信输入。当前 CLI 注入开发用户 alice；工具仅接受 order_id。后续接入登录认证时，用已认证主体替换演示主体，继续维持这个边界。
 
-整改后 Executor 不绑定固定用户；每次 Run 接收可信 Principal，Catalog 为本轮绑定工具。CLI 仍提供固定开发身份，尚未实现真实登录与服务端会话管理。
+当前 Agent 不绑定固定用户；工具集中注册，调用时从 context.Context 读取本轮用户。CLI 仍提供固定开发身份，尚未实现真实登录与服务端会话管理。
 
 ### 为什么用业务结果，而不把所有情况都当异常
 
@@ -173,7 +168,7 @@ Runner 设置 EnableStreaming=false，模型使用完整消息响应，AgentEven
 
 ### 工具执行证据与最终回答
 
-当前 Executor 核对工具调用与结果关联，但允许无工具的澄清回答。早期版本的 ErrNoToolEvidence 已移除，不能把订单查询专用规则用于所有回答。订单 Profile 要求具体状态依据工具查询；是否忠实于结果仍需业务核验与效果评估，不能靠提示词保证。
+当前 Agent 核对工具调用与结果关联，但允许无工具的澄清回答。早期版本的 ErrNoToolEvidence 已移除，不能把订单查询专用规则用于所有回答。订单 Profile 要求具体状态依据工具查询；是否忠实于结果仍需业务核验与效果评估，不能靠提示词保证。
 
 ## 12. 你现在怎么运行
 
@@ -266,3 +261,5 @@ make smoke 会在临时目录创建自己的 .env、本地模型协议服务与�
 完成后继续补充真实模型联调结果。后续再建设运行/事件持久化、HTTP 接入和身份认证，按总体设计逐步走向完整平台。
 
 接口依据：已锁定版本中的 [ADK ChatModelAgent](https://github.com/cloudwego/eino/blob/v0.9.22/adk/chatmodel.go)、[Runner](https://github.com/cloudwego/eino/blob/v0.9.22/adk/runner.go)、[工具辅助组件](https://github.com/cloudwego/eino/blob/v0.9.22/components/tool/utils/invokable_func.go)。本课具体保证以应用代码和测试为准，框架存在机制不等于应用已自动获得完整业务保障。
+
+当前设计已移除提前引入的租户要求，C300 也按其他用户订单处理；早期多租户描述仅为历史方案，不能作为当前功能声明。见 03d。
