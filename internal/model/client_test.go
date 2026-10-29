@@ -46,7 +46,7 @@ data: [DONE]
 	}))
 	defer server.Close()
 	var output bytes.Buffer
-	err := StreamText(context.Background(), config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: time.Second}, "你好", &output)
+	err := streamConfigured(context.Background(), config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: time.Second}, "你好", &output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 				cancel()
 			}
 			var output bytes.Buffer
-			err := StreamText(ctx, cfg, "hello", &output)
+			err := streamConfigured(ctx, cfg, "hello", &output)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -118,12 +118,12 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 }
 
 func TestStreamTextRejectsEmptyInput(t *testing.T) {
-	if err := StreamText(context.Background(), config.ModelConfig{}, " ", io.Discard); err == nil {
+	if err := streamConfigured(context.Background(), config.ModelConfig{}, " ", io.Discard); err == nil {
 		t.Fatal("expected error")
 	}
 	cfg := config.ModelConfig{BaseURL: "https://model.example/v1", Model: "x", APIKey: "x", Timeout: time.Second}
 	cfg.Timeout = 0
-	if err := StreamText(context.Background(), cfg, "hello", io.Discard); err == nil {
+	if err := streamConfigured(context.Background(), cfg, "hello", io.Discard); err == nil {
 		t.Fatal("expected settings error")
 	}
 }
@@ -156,7 +156,7 @@ func TestStreamTextEmptyAndOutputFailures(t *testing.T) {
 			}))
 			defer server.Close()
 			cfg := config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: time.Second}
-			err := StreamText(context.Background(), cfg, "hello", tt.writer)
+			err := streamConfigured(context.Background(), cfg, "hello", tt.writer)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("error=%v, want %v", err, tt.want)
 			}
@@ -187,4 +187,23 @@ func TestNewClientHonorsTimeout(t *testing.T) {
 	if err == nil || ctx.Err() != nil {
 		t.Fatalf("configured client timeout not honored before outer deadline: %v", err)
 	}
+}
+
+func streamConfigured(ctx context.Context, cfg config.ModelConfig, prompt string, output io.Writer) error {
+	client, err := NewClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return StreamText(ctx, client, prompt, func(text string) error {
+		n, err := io.WriteString(output, text)
+		if err != nil {
+			return err
+		}
+		if n != len(text) {
+			return io.ErrShortWrite
+		}
+		return nil
+	})
 }

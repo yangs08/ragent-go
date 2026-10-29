@@ -7,6 +7,8 @@
 - 关联：M0 的 ADK 兼容原型；C13 工具型 Agent 的起点，不代表完整 Agent 平台已交付。
 - 实施位置：`/Users/admin/workspace/ragent-go`。
 
+架构更新：第三课已将本课代码按职责重整；当前阅读路径与行为以下文及 [综合整改实践](03c-architecture-refactor.md) 为准，早期提交记录保留作为历史。
+
 路径说明：命令中的 `/path/to/ragent-go` 请替换为自己的项目目录；本机环境记录保留历史实际路径。课程正式文档位于项目 `docs/lessons/`。
 
 ## 1. 本课目标
@@ -112,30 +114,25 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 ## 9. 实际新增的模块与阅读顺序
 
 ```text
-internal/tooling/order.go          订单查询工具、可信身份、只读模拟数据
-internal/tooling/order_test.go     Schema、参数与资源隔离验证
-internal/agent/order_agent.go      ADK 装配、运行、事件与执行证据检查
-internal/config/agent.go           Agent 配置（第三课整改后统一管理）
-internal/agent/*_test.go           真实 ADK + 本地协议服务测试
-internal/model/client.go           复用 NewClient，单次模型请求超时
-cmd/agentcheck/                    读取 .env 并装配演示 Agent
-scripts/smoke.py                   三个命令进程的本地冒烟
+internal/bootstrap/agent.go    开发环境显式装配
+internal/agent/provider.go     Agent 定义与 Eino 装配
+internal/agent/executor.go     通用运行、事件与共享预算
+internal/tooling/catalog.go    本轮工具注册与身份绑定
+internal/tooling/order.go      订单工具 Schema 与参数适配
+internal/order/service.go      订单业务、授权、Repository
+internal/devdata/orders.go     开发数据适配器
+internal/identity/principal.go 可信执行主体
+internal/config/agent.go       集中管理的执行配置
+cmd/agentcheck/                诊断入口与 JSONL 输出
 ```
 
-按以下顺序学习，不必一次阅读全部代码：
-
-1. 先读 `OrderResult`，明确结果为 ok、not_found、invalid_arguments 或 unavailable；有最终回答不等于业务查询成功。
-2. 读 `Principal` 和 `OrderStore.Find(ctx, tenant, id)`：租户从程序传入存储，不由模型选择；读取之后还检查用户归属。
-3. 读 NewOrderTool 与 decodeOrderInput：Schema 是给模型看的约束，标准库 Decoder 才是服务端参数检查；未知字段、错误类型、额外顶层 JSON 和超长输入不会到达存储。
-4. 读 NewOrderAgent：复用 ADK ChatModelAgent + Runner；应用声明模型、工具和边界，不自己重写 ReAct。
-5. 读 Run：消费调用、结果和最终回答，理解 tool_call_id 的关联与执行证据。
-6. 最后读 runOrderCheck：入口复用 .env 与模型配置，固定演示身份并启动任务。
+按装配 → 执行 → 工具 → 业务 → 仓储的顺序阅读，完整解释见第三课综合整改实践。
 
 ### 为什么身份不放在 Tool Schema 中
 
 模型可以自行生成工具参数。如果工具允许模型指定 tenant_id 或 user_id，相当于把资源访问范围交给不可信输入。当前程序固定演示主体为租户 acme、用户 alice；工具仅接受 order_id。后续接入登录认证时，用已认证主体替换演示主体，继续维持这个边界。
 
-构造出的 OrderAgent 绑定一个主体；只能复用于该主体，不能直接作为所有用户共享的实例。每次 Run 的计数器和事件状态独立，本课尚未实现真实登录与服务端会话管理。
+整改后 Executor 不绑定固定用户；每次 Run 接收可信 Principal，Catalog 为本轮绑定工具。CLI 仍提供固定开发身份，尚未实现真实登录与服务端会话管理。
 
 ### 为什么用业务结果，而不把所有情况都当异常
 
@@ -176,11 +173,7 @@ Runner 设置 EnableStreaming=false，模型使用完整消息响应，AgentEven
 
 ### 工具执行证据与最终回答
 
-Run 会核对工具调用/结果关联，并在展示最终回答前要求确有工具执行与结果事件。模型直接说“已经查过”而没有调用工具时，返回 ErrNoToolEvidence，不将其显示为成功答案。
-
-这个检查只能证明执行轨迹存在，不能证明最终自然语言与证据完全一致，也不能证明业务结果为 ok。答案忠实性、覆盖全部被问订单、引用与效果评估仍需继续建设。
-
-它是本课“必须查订单”的专用约束；通用 Agent 还要允许澄清和闲聊，不能把本规则无条件复制到所有任务。
+当前 Executor 核对工具调用与结果关联，但允许无工具的澄清回答。早期版本的 ErrNoToolEvidence 已移除，不能把订单查询专用规则用于所有回答。订单 Profile 要求具体状态依据工具查询；是否忠实于结果仍需业务核验与效果评估，不能靠提示词保证。
 
 ## 12. 你现在怎么运行
 

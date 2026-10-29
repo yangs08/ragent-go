@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"ragent-go/internal/config"
 )
@@ -20,27 +21,23 @@ func NewClient(ctx context.Context, cfg config.ModelConfig) (*openai.ChatModel, 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	maxTokens := 256
-	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Timeout: cfg.Timeout, MaxCompletionTokens: &maxTokens})
+	maxTokens := cfg.MaxCompletionTokens
+	var tokenLimit *int
+	if maxTokens > 0 {
+		tokenLimit = &maxTokens
+	}
+	client, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Timeout: cfg.Timeout, MaxCompletionTokens: tokenLimit})
 	if err != nil {
 		return nil, fmt.Errorf("create model: %w", ErrProvider)
 	}
 	return client, nil
 }
 
-// StreamText exercises the real Eino adapter without implementing retries or routing.
-func StreamText(ctx context.Context, cfg config.ModelConfig, prompt string, output io.Writer) error {
-	if strings.TrimSpace(prompt) == "" {
-		return errors.New("model prompt must not be empty")
-	}
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-	defer cancel()
-	client, err := NewClient(ctx, cfg)
-	if err != nil {
-		return err
+// StreamText consumes a configured model and emits text synchronously.
+// Callers own overall deadlines and output protocols; provider errors are redacted.
+func StreamText(ctx context.Context, client einomodel.BaseChatModel, prompt string, emit func(string) error) error {
+	if strings.TrimSpace(prompt) == "" || client == nil || emit == nil {
+		return errors.New("model, prompt and text consumer are required")
 	}
 	stream, err := client.Stream(ctx, []*schema.Message{schema.UserMessage(prompt)})
 	if err != nil {
@@ -62,12 +59,8 @@ func StreamText(ctx context.Context, cfg config.ModelConfig, prompt string, outp
 		if strings.TrimSpace(part.Content) != "" {
 			receivedText = true
 		}
-		n, err := io.WriteString(output, part.Content)
-		if err != nil {
-			return fmt.Errorf("write model output: %w", err)
-		}
-		if n != len(part.Content) {
-			return io.ErrShortWrite
+		if err := emit(part.Content); err != nil {
+			return err
 		}
 	}
 	if !receivedText {

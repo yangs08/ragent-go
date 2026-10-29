@@ -19,10 +19,10 @@ func TestRunOrderCheckConfiguration(t *testing.T) {
 		t.Fatal("invalid agent limits accepted")
 	}
 }
-func TestRunOrderCheckPropagatesUnverifiedAnswer(t *testing.T) {
+func TestRunOrderCheckAllowsClarification(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"index": 0, "finish_reason": "stop", "message": map[string]string{"role": "assistant", "content": "private-unverified-answer"}}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"index": 0, "finish_reason": "stop", "message": map[string]string{"role": "assistant", "content": "请提供订单编号"}}}})
 	}))
 	defer server.Close()
 	env := map[string]string{"RAGENT_MODEL_BASE_URL": server.URL + "/v1", "RAGENT_MODEL_NAME": "test", "RAGENT_MODEL_API_KEY": "test"}
@@ -30,7 +30,7 @@ func TestRunOrderCheckPropagatesUnverifiedAnswer(t *testing.T) {
 		env["RAGENT_AGENT_PROMPT"] = prompt
 		var out strings.Builder
 		err := runOrderCheck(context.Background(), func(k string) string { return env[k] }, &out)
-		if err == nil || strings.Contains(out.String(), "private-unverified-answer") {
+		if err != nil || !strings.Contains(out.String(), "请提供订单编号") {
 			t.Fatalf("error=%v output=%s", err, out.String())
 		}
 	}

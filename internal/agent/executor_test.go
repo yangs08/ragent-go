@@ -15,7 +15,12 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 	"ragent-go/internal/config"
+	"ragent-go/internal/devdata"
+	"ragent-go/internal/identity"
+	"ragent-go/internal/order"
 	"ragent-go/internal/tooling"
 )
 
@@ -29,7 +34,7 @@ type providerRequest struct {
 	} `json:"messages"`
 }
 
-func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentConfig) (*OrderAgent, *atomic.Int32) {
+func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentConfig) (*Executor, *atomic.Int32) {
 	t.Helper()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +46,9 @@ func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentCo
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent, err := NewOrderAgent(model, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, options)
+	service, _ := order.NewService(devdata.DemoOrders())
+	catalog, _ := tooling.NewCatalog(service)
+	agent, err := NewExecutor(model, catalog, Definition{Name: "test", Instruction: "使用工具查询订单", ExposeToolResults: true}, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +83,7 @@ func TestOrderAgentActualADKLoop(t *testing.T) {
 					if last.ToolCallID != "call-order" {
 						t.Errorf("call id=%s", last.ToolCallID)
 					}
-					var result tooling.OrderResult
+					var result order.Result
 					if err := json.Unmarshal([]byte(last.Content), &result); err != nil {
 						t.Error(err)
 					}
@@ -89,7 +96,7 @@ func TestOrderAgentActualADKLoop(t *testing.T) {
 				toolResponse(w, fmt.Sprintf(`{"order_id":%q}`, tt.id))
 			}, testOptions())
 			var output bytes.Buffer
-			if err := agent.Run(context.Background(), "查询订单 "+tt.id, jsonSink(&output)); err != nil {
+			if err := agent.Run(context.Background(), testRequest("查询订单 "+tt.id), jsonSink(&output)); err != nil {
 				t.Fatal(err)
 			}
 			if calls.Load() != 2 {
@@ -111,19 +118,21 @@ func TestOrderAgentActualADKLoop(t *testing.T) {
 			if len(events) != 3 || events[0].Type != "tool_call" || events[1].Type != "tool_result" || events[2].Type != "answer" {
 				t.Fatalf("events=%+v", events)
 			}
-			if events[0].CallID != "call-order" || events[1].CallID != "call-order" || events[1].Result.Code != tt.code || events[2].Content != tt.answer {
+			if events[0].CallID != "call-order" || events[1].CallID != "call-order" || resultCode(events[1].Result) != tt.code || events[2].Content != tt.answer {
 				t.Fatalf("events=%+v", events)
 			}
 		})
 	}
 }
 
-func TestOrderAgentRequiresToolEvidence(t *testing.T) {
-	agent, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) { answerResponse(w, "我已经查过，订单已完成") }, testOptions())
-	var output bytes.Buffer
-	err := agent.Run(context.Background(), "查订单 A100", jsonSink(&output))
-	if !errors.Is(err, ErrNoToolEvidence) || strings.Contains(output.String(), "我已经查过") {
-		t.Fatalf("error=%v output=%s", err, output.String())
+func TestExecutorAllowsClarificationWithoutTool(t *testing.T) {
+	agent, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) { answerResponse(w, "请提供订单编号") }, testOptions())
+	var events []Event
+	if err := agent.Run(context.Background(), testRequest("帮我查订单"), func(e Event) error { events = append(events, e); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Type != "answer" || events[0].Content != "请提供订单编号" {
+		t.Fatalf("events=%+v", events)
 	}
 }
 
@@ -153,7 +162,7 @@ func TestOrderAgentLimitsAndSafeProviderErrors(t *testing.T) {
 					toolResponse(w, `{"order_id":"A100"}`)
 				}
 			}, opts)
-			err := agent.Run(context.Background(), "查订单", jsonSink(io.Discard))
+			err := agent.Run(context.Background(), testRequest("查订单"), jsonSink(io.Discard))
 			if err == nil || strings.Contains(err.Error(), "private-provider-detail") {
 				t.Fatalf("error=%v", err)
 			}
@@ -181,7 +190,7 @@ func TestOrderAgentCancellationAndDeadline(t *testing.T) {
 			if kind == "cancel" {
 				cancel()
 			}
-			err := agent.Run(ctx, "查订单", jsonSink(io.Discard))
+			err := agent.Run(ctx, testRequest("查订单"), jsonSink(io.Discard))
 			want := context.DeadlineExceeded
 			if kind == "cancel" {
 				want = context.Canceled
@@ -198,24 +207,24 @@ type failingOutput struct{}
 func (failingOutput) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 func TestOrderAgentInputAndOutputErrors(t *testing.T) {
 	agent, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) { toolResponse(w, `{"order_id":"A100"}`) }, testOptions())
-	if err := agent.Run(context.Background(), " ", jsonSink(io.Discard)); err == nil {
+	if err := agent.Run(context.Background(), testRequest(" "), jsonSink(io.Discard)); err == nil {
 		t.Fatal("empty question accepted")
 	}
-	if err := agent.Run(context.Background(), "查订单", nil); err == nil {
+	if err := agent.Run(context.Background(), testRequest("查订单"), nil); err == nil {
 		t.Fatal("nil output accepted")
 	}
-	if err := agent.Run(context.Background(), "查订单", jsonSink(failingOutput{})); !errors.Is(err, io.ErrClosedPipe) {
+	if err := agent.Run(context.Background(), testRequest("查订单"), jsonSink(failingOutput{})); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatalf("error=%v", err)
 	}
-	if _, err := NewOrderAgent(nil, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, testOptions()); err == nil {
+	if _, err := NewExecutor(nil, agent.catalog, agent.definition, testOptions()); err == nil {
 		t.Fatal("nil model accepted")
 	}
 	for _, opts := range []config.AgentConfig{{}, {MaxIterations: 21, MaxToolCalls: 3, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 21, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 3, Timeout: 6 * time.Minute}} {
-		if _, err := NewOrderAgent(agent.model, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, opts); err == nil {
+		if _, err := NewExecutor(agent.model, agent.catalog, agent.definition, opts); err == nil {
 			t.Fatal("invalid options accepted")
 		}
 	}
-	if _, err := NewOrderAgent(agent.model, nil, tooling.Principal{}, testOptions()); err == nil {
+	if _, err := NewExecutor(agent.model, nil, agent.definition, testOptions()); err == nil {
 		t.Fatal("invalid tool dependencies accepted")
 	}
 }
@@ -232,7 +241,7 @@ func TestOrderAgentSinkFailureStopsExecution(t *testing.T) {
 	}, testOptions())
 	sentinel := errors.New("consumer stopped")
 	count := 0
-	err := agent.Run(context.Background(), "查 A100", func(event Event) error {
+	err := agent.Run(context.Background(), testRequest("查 A100"), func(event Event) error {
 		count++
 		if event.Type != "tool_call" {
 			t.Errorf("first event=%+v", event)
@@ -264,7 +273,7 @@ func TestOrderAgentConcurrentRunsHaveIndependentBudgets(t *testing.T) {
 	for i := 0; i < runs; i++ {
 		go func() {
 			var types []string
-			err := agent.Run(context.Background(), "查 A100", func(event Event) error {
+			err := agent.Run(context.Background(), testRequest("查 A100"), func(event Event) error {
 				types = append(types, event.Type)
 				return nil
 			})
@@ -281,5 +290,84 @@ func TestOrderAgentConcurrentRunsHaveIndependentBudgets(t *testing.T) {
 	}
 	if calls.Load() != runs*2 {
 		t.Fatalf("model calls=%d", calls.Load())
+	}
+}
+
+func testRequest(question string) Request {
+	return Request{Question: question, Principal: identity.Principal{TenantID: "acme", UserID: "alice"}}
+}
+func resultCode(data json.RawMessage) string {
+	var result order.Result
+	_ = json.Unmarshal(data, &result)
+	return result.Code
+}
+
+func TestExecutorBindsIdentityPerRun(t *testing.T) {
+	executor, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) {
+		var req providerRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+			return
+		}
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			answerResponse(w, "查询完成")
+			return
+		}
+		toolResponse(w, `{"order_id":"A100"}`)
+	}, testOptions())
+	for _, tt := range []struct{ user, code string }{{"alice", "ok"}, {"bob", "not_found"}, {"alice", "ok"}} {
+		req := testRequest("查询 A100")
+		req.Principal.UserID = tt.user
+		code := ""
+		err := executor.Run(context.Background(), req, func(e Event) error {
+			if e.Type == "tool_result" {
+				code = resultCode(e.Result)
+			}
+			return nil
+		})
+		if err != nil || code != tt.code {
+			t.Fatalf("user=%s code=%s error=%v", tt.user, code, err)
+		}
+	}
+	req := testRequest("查询 A100")
+	req.Principal = identity.Principal{}
+	if err := executor.Run(context.Background(), req, func(Event) error { return nil }); err == nil {
+		t.Fatal("missing identity accepted")
+	}
+}
+
+type resolveTools func(context.Context, identity.Principal) ([]tool.InvokableTool, error)
+
+func (f resolveTools) Resolve(ctx context.Context, p identity.Principal) ([]tool.InvokableTool, error) {
+	return f(ctx, p)
+}
+func TestExecutorSupportsOtherToolsWithoutExposingResultsByDefault(t *testing.T) {
+	executor, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) {
+		var req providerRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+			return
+		}
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			answerResponse(w, "晴")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"weather-call","type":"function","function":{"name":"lookup_weather","arguments":"{}"}}]}}]}`)
+	}, testOptions())
+	weather, err := utils.InferTool("lookup_weather", "查询天气", func(context.Context, struct{}) (string, error) { return "晴", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor.catalog = resolveTools(func(context.Context, identity.Principal) ([]tool.InvokableTool, error) {
+		return []tool.InvokableTool{weather}, nil
+	})
+	executor.definition.ExposeToolResults = false
+	var events []Event
+	if err := executor.Run(context.Background(), testRequest("天气"), func(e Event) error { events = append(events, e); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 3 || events[0].Tool != "lookup_weather" || len(events[1].Result) != 0 || events[2].Content != "晴" {
+		t.Fatalf("events=%+v", events)
 	}
 }

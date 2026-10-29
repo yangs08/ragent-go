@@ -39,7 +39,7 @@ cfg, err := config.Load(getenv)
 // 检查 err
 client, err := model.NewClient(ctx, cfg.Model)
 // 检查 err
-orderAgent, err := agent.NewOrderAgent(client, store, principal, cfg.Agent)
+executor, err := agent.NewExecutor(client, catalog, definition, cfg.Agent)
 ```
 
 上述省略错误分支只为展示调用关系，实际代码必须处理错误。配置在进程入口读取，组件接收自己需要的配置值；组件不会重新查询环境。不要打印整个 cfg，Model 中含密钥。
@@ -65,3 +65,5 @@ orderAgent, err := agent.NewOrderAgent(client, store, principal, cfg.Agent)
 阅读 cmd/agentcheck/main.go：找出配置加载、客户端构造、执行和输出四个步骤。思考：配置为什么由启动层加载？为什么构造函数仍需校验？为什么不将当前用户身份放进 Config？为什么 cfg.Agent.Timeout 与 cfg.Model.Timeout 需要分别管理？
 
 本课只调整配置体系。订单示例、用户身份生命周期与聊天应用服务仍按 ARCHITECTURE.md 继续整改。
+
+后续更新：订单业务与执行身份的整改已完成，见 [综合整改](03c-architecture-refactor.md)。ModelConfig 另增加 MaxCompletionTokens，默认 256。

@@ -11,9 +11,9 @@ import (
 	"syscall"
 
 	"ragent-go/internal/agent"
+	"ragent-go/internal/bootstrap"
 	"ragent-go/internal/config"
-	"ragent-go/internal/model"
-	"ragent-go/internal/tooling"
+	"ragent-go/internal/identity"
 )
 
 func main() {
@@ -34,12 +34,10 @@ func runOrderCheck(ctx context.Context, getenv func(string) string, output io.Wr
 	if err != nil {
 		return err
 	}
-	client, err := model.NewClient(ctx, cfg.Model)
-	if err != nil {
-		return err
+	if output == nil {
+		return errors.New("agent output is required")
 	}
-	// The CLI demonstrates one trusted identity. Production authentication comes later.
-	orderAgent, err := agent.NewOrderAgent(client, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, cfg.Agent)
+	executor, err := bootstrap.NewDevelopmentAgent(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -47,11 +45,8 @@ func runOrderCheck(ctx context.Context, getenv func(string) string, output io.Wr
 	if question == "" {
 		question = "查询 A100 订单的状态，请先调用订单工具再回答。"
 	}
-	if output == nil {
-		return errors.New("agent output is required")
-	}
 	encoder := json.NewEncoder(output)
-	return orderAgent.Run(ctx, question, func(event agent.Event) error {
+	return executor.Run(ctx, agent.Request{Question: question, Principal: identity.Principal{TenantID: "acme", UserID: "alice"}}, func(event agent.Event) error {
 		return encoder.Encode(event)
 	})
 }

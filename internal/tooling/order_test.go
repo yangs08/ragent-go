@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/cloudwego/eino/components/tool"
+	"ragent-go/internal/devdata"
+	"ragent-go/internal/identity"
+	"ragent-go/internal/order"
 	"strings"
 	"testing"
 )
@@ -14,17 +18,17 @@ type storeStub struct {
 	err    error
 }
 
-func (s *storeStub) Find(ctx context.Context, tenant, id string) (Order, bool, error) {
+func (s *storeStub) Find(ctx context.Context, tenant, id string) (order.Order, bool, error) {
 	s.calls++
 	s.tenant = tenant
 	if s.err != nil {
-		return Order{}, false, s.err
+		return order.Order{}, false, s.err
 	}
-	return Order{ID: id, TenantID: tenant, UserID: "alice", Status: "shipped"}, true, nil
+	return order.Order{ID: id, TenantID: tenant, UserID: "alice", Status: "shipped"}, true, nil
 }
 
 func TestOrderToolSchema(t *testing.T) {
-	tool, err := NewOrderTool(DemoOrders(), Principal{TenantID: "acme", UserID: "alice"})
+	tool, err := newTestOrderTool(devdata.DemoOrders(), identity.Principal{TenantID: "acme", UserID: "alice"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +79,7 @@ func TestOrderToolResults(t *testing.T) {
 		{"oversized", strings.Repeat("x", 4097), "invalid_arguments", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			tool, err := NewOrderTool(DemoOrders(), Principal{TenantID: "acme", UserID: "alice"})
+			tool, err := newTestOrderTool(devdata.DemoOrders(), identity.Principal{TenantID: "acme", UserID: "alice"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +87,7 @@ func TestOrderToolResults(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var result OrderResult
+			var result order.Result
 			if err := json.Unmarshal([]byte(output), &result); err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +111,7 @@ func TestOrderToolResults(t *testing.T) {
 
 func TestOrderToolRejectsBeforeStoreAndUsesBoundTenant(t *testing.T) {
 	store := &storeStub{}
-	tool, err := NewOrderTool(store, Principal{TenantID: "acme", UserID: "alice"})
+	tool, err := newTestOrderTool(store, identity.Principal{TenantID: "acme", UserID: "alice"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +131,7 @@ func TestOrderToolRejectsBeforeStoreAndUsesBoundTenant(t *testing.T) {
 
 func TestOrderToolCancellationAndStoreFailure(t *testing.T) {
 	store := &storeStub{err: errors.New("private-database-detail")}
-	tool, err := NewOrderTool(store, Principal{TenantID: "acme", UserID: "alice"})
+	tool, err := newTestOrderTool(store, identity.Principal{TenantID: "acme", UserID: "alice"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +139,7 @@ func TestOrderToolCancellationAndStoreFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var result OrderResult
+	var result order.Result
 	_ = json.Unmarshal([]byte(output), &result)
 	if result.Code != "unavailable" || strings.Contains(output, "private-database-detail") {
 		t.Fatal("unsafe store error")
@@ -149,18 +153,18 @@ func TestOrderToolCancellationAndStoreFailure(t *testing.T) {
 }
 
 func TestOrderToolNeedsTrustedDependencies(t *testing.T) {
-	if _, err := NewOrderTool(nil, Principal{TenantID: "acme", UserID: "alice"}); err == nil {
+	if _, err := newTestOrderTool(nil, identity.Principal{TenantID: "acme", UserID: "alice"}); err == nil {
 		t.Fatal("nil store accepted")
 	}
-	for _, principal := range []Principal{{}, {TenantID: "acme"}, {UserID: "alice"}} {
-		if _, err := NewOrderTool(DemoOrders(), principal); err == nil {
+	for _, principal := range []identity.Principal{{}, {TenantID: "acme"}, {UserID: "alice"}} {
+		if _, err := newTestOrderTool(devdata.DemoOrders(), principal); err == nil {
 			t.Fatal("missing trusted identity accepted")
 		}
 	}
 }
 
 func TestDemoOrdersRespectsContextAndTenant(t *testing.T) {
-	store := DemoOrders()
+	store := devdata.DemoOrders()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, _, err := store.Find(ctx, "acme", "A100"); !errors.Is(err, context.Canceled) {
@@ -169,4 +173,12 @@ func TestDemoOrdersRespectsContextAndTenant(t *testing.T) {
 	if _, found, err := store.Find(context.Background(), "acme", "C300"); err != nil || found {
 		t.Fatal("tenant filter failed")
 	}
+}
+
+func newTestOrderTool(repository order.Repository, principal identity.Principal) (tool.InvokableTool, error) {
+	service, err := order.NewService(repository)
+	if err != nil {
+		return nil, err
+	}
+	return NewOrderTool(service, principal)
 }

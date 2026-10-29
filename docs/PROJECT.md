@@ -152,6 +152,8 @@ ragent-go/
 
 这是职责图，不一次性创建所有空目录。接口定义在调用方需要的位置，Eino 的组件类型可在 AI 编排层直接使用；业务实体不嵌入 Runner、数据库驱动或供应商私有类型。Agent 和固定 RAG 依赖共享检索，检索不反向依赖 Agent，也不负责整轮对话生成。
 
+现有代码的具体问题、请求主链路、对象生命周期及整改顺序见 [应用架构基线](ARCHITECTURE.md)。执行器与输出协议、订单业务和按轮身份已分离；当前实现见架构基线。HTTP 接入前仍需建立聊天应用服务与会话边界。
+
 ### 4.3 技术决策初稿
 
 | 决策 | 当前建议 | 理由与验证条件 |
@@ -237,28 +239,13 @@ pgvector 提供 PostgreSQL 向量检索能力；具体过滤与近似索引的�
 - Checkpoint 解决执行状态恢复，不能提供跨系统 exactly-once；不能把“支持 Resume”解释为“任意失败都不会重复写”。
 - 进程崩溃后的恢复分三种：安全检查点后可续跑、只读步骤可重算、写入结果不明需对账。明确记录所处情况。
 
-### 5.5 拟定 API 与事件边界
+### 5.5 第一版 HTTP 与连接策略（2026-10-29 更新）
 
-以下是本项目草案，不是照搬 Ragent 已有接口，也不是当前已实现接口。
+按用户选择，第一版参考 Ragent 的接口：GET /agent/v1/chat 接收 question 和可选 conversationId，直接返回 SSE，首个 meta 事件携带 conversationId/taskId；POST /agent/v1/stop?taskId=... 主动停止。首次聊天自动创建会话，不要求先创建 Run 资源；断线、超时、写出失败或主动停止触发取消。保留会话/消息/Run 与部分结果记录，同会话互斥。取消不能撤销已完成的工具动作，清理使用独立有期限的 context。
 
-| 接口 | 输入/作用 | 关键契约 |
-|---|---|---|
-| `POST /api/v1/knowledge-bases` | 创建知识库 | Principal 决定租户；知识管理员权限 |
-| `POST /api/v1/knowledge-bases/{id}/documents` | 上传并创建文档/任务 | 有限文件大小、内容校验、返回 document_id/task_id |
-| `GET /api/v1/ingestion-tasks/{id}` | 任务和节点执行状态 | 有权限才能读错误与产物；错误对外脱敏 |
-| `POST /api/v1/conversations/{id}/runs` | 输入问题、mode=rag/agent、客户端请求键 | 返回 run_id；同请求键和同载荷复用结果，异载荷报冲突；模型与租户字段不由用户越权指定 |
-| `GET /api/v1/runs/{id}/events` | 鉴权 SSE | 订阅不触发新执行；event_id/seq 支持补发，超过保留窗口返回明确过期语义 |
-| `POST /api/v1/runs/{id}/approvals/{approval_id}` | approved/rejected + 决策请求键 | 校验审批身份/参数摘要/状态；重复决策不重复执行 |
-| `POST /api/v1/runs/{id}/cancel` | 主动取消 | 幂等；跨实例找到执行者；晚到回调不能覆盖终态 |
-| `GET /api/v1/runs/{id}` | 查询持久状态 | 流断开后也能查询最终结果 |
+第一版不提供独立事件订阅、断线补发或自动请求重试，不承诺 Idempotency-Key 找回任务；这些作为后续扩展。后台 Run/事件重放与 Checkpoint 恢复不作为首次 HTTP 接入前提。知识入库的持久任务/Worker 设计保持不变。
 
-事件拟包含：run_started、retrieval_completed、tool_started、tool_completed、approval_required、message_delta、attempt_reset、run_completed、run_failed、run_cancelled。每条携带 run_id、seq、type、time、payload；生成事件另有 message_id、attempt_id，工具事件另有 invocation_id。
-
-为避免“断线重连造成重复任务”，运行与 SSE 订阅解耦：订阅断开只关闭该订阅，运行遵循自身超时/取消策略。所有运行有截止时间，显式取消传播到模型与下游；这与直接将整个运行绑定 HTTP 请求 context 的行为不同。
-
-语义事件持久化，token delta 按批次持久化或合并为可回放片段，限定缓冲和保留期；慢订阅者断开后可补发，不能无限堆积内存。不能用 Redis Pub/Sub 承诺历史补发。
-
-流式失败重试时，已发出的内容不能无声拼接备用模型输出；用 attempt_reset 与 attempt_id 告知前端替换对应内容。最终消息只落当前有效轮次，保留失败轮次的诊断记录。
+详细接口、边界与验收以 [第三课](lessons/03-api-and-run-contract.md) 为准。未来引入后台执行后，再添加独立 GET events、事件持久化及幂等提交机制。
 
 ## 6. 质量、观测与安全验收
 

@@ -20,7 +20,7 @@ type ServerConfig struct {
 	LogLevel        slog.Level
 }
 
-// Load validates configuration before the application opens any listener.
+// loadServer parses and validates the server configuration.
 func loadServer(getenv func(string) string) (ServerConfig, error) {
 	cfg := ServerConfig{HTTPAddr: "127.0.0.1:8080", ShutdownTimeout: 5 * time.Second, LogLevel: slog.LevelInfo}
 	if value := getenv("RAGENT_HTTP_ADDR"); value != "" {

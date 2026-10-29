@@ -12,6 +12,7 @@
 - [项目设计与能力地图](PROJECT.md)：最终范围、架构、边界、里程碑和验收要求。
 - [第 01 课：项目初始化与 Eino 兼容性验证](lessons/01-project-bootstrap.md)：代码与本地验收完成，真实模型正常调用已验证，待学员练习。
 - [第 02 课：基于 Eino ADK 的工具型 Agent](lessons/02-agent-and-tools.md)：本地实现与验收完成，真实工具调用联调待验证。
+- [第 03 课：API 与运行契约](lessons/03-api-and-run-contract.md)：契约初稿，待 OpenAPI 与实现。
 - [课程文档模板](lessons/TEMPLATE.md)：后续每课沿用的记录结构。
 
 ## 每课记录规则
@@ -33,3 +34,11 @@
 | 02 | 基于 Eino ADK 的工具型 Agent | 本地验收完成，待学员操作 | 工具/ADK/CLI 通过，整体覆盖率 86.5%，真实供应商工具能力待验证 |
 
 后续课程按 [ROADMAP.md](ROADMAP.md) 的 40 节主线推进，复杂模块可拆课；每课围绕可验收成果展开，完整能力范围见 PROJECT.md。
+
+- [应用架构基线与现有代码整改](ARCHITECTURE.md)
+
+- [第 03 课补充实践：执行与输出分离](lessons/03a-execution-and-output.md)
+
+- [第 03 课补充实践：统一应用配置](lessons/03b-unified-config.md)
+
+- [第 03 课补充实践：应用架构综合整改](lessons/03c-architecture-refactor.md)

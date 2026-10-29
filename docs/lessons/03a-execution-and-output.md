@@ -11,7 +11,7 @@
 现在调用关系为：
 
 ```text
-agentcheck → OrderAgent.Run(ctx, question, EventSink)
+agentcheck → Executor.Run(ctx, Request, EventSink)
                          ↓
                  同步发出类型化 Event
                          ↓
@@ -22,9 +22,9 @@ agentcheck → OrderAgent.Run(ctx, question, EventSink)
 
 ## 阅读代码
 
-1. internal/agent/order_agent.go：EventSink 定义、Run 的事件发出位置及错误返回。
+1. internal/agent/executor.go：EventSink 定义、Run 的事件发出位置及错误返回。
 2. cmd/agentcheck/main.go：在入口创建 json.Encoder，通过回调消费事件。
-3. internal/agent/order_agent_test.go：实际 ADK 与本地模型协议服务测试，不调用付费模型。
+3. internal/agent/executor_test.go：实际 ADK 与本地模型协议服务测试，不调用付费模型。
 
 EventSink 是 func(Event) error；同步调用，事件按执行器消费顺序到达。返回错误时 Run 返回该错误，defer cancel 取消本轮 context；Run 返回后不再调用回调。回调应及时返回，Go 的 context 无法强制终止一个阻塞的回调。未来 SSE 写入必须设置写期限，不能只依赖 context。
 
@@ -42,10 +42,12 @@ make smoke
 
 make smoke 使用本地协议服务验证 CLI 输出，make agentcheck 会调用配置中的真实模型，可能产生用量。
 
-## 本次仍存在的边界问题
+## 此阶段的边界问题（后续整改记录）
 
 OrderAgent 仍是订单示例，工具名、结果结构和证据策略尚未泛化；Principal 仍在构造时绑定，只能在当前固定身份示例下使用。没有新增认证、ChatService、数据库或 HTTP 聊天接口。后续先分离订单示例职责和按请求身份，再接应用服务，不能把当前实例直接作为跨用户的全局服务。
 
 ## 练习与理解检查
 
 尝试传入一个只收集 Event 的回调，不进行 JSON 编码。解释：为什么执行器不需要知道 stdout 或 SSE？为什么回调失败要停止本轮？为什么同步回调仍然需要输出超时？为什么这一步还没有解决多用户授权对象的生命周期？
+
+后续更新：本节所述订单耦合和构造绑定主体已在 [综合整改](03c-architecture-refactor.md) 解决；认证、ChatService 和持久化仍待实现。

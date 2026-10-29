@@ -38,3 +38,9 @@ Base URL 禁止内嵌凭据、查询参数或 fragment。该命令仅用于开�
 | RAGENT_AGENT_TIMEOUT | 30s | 整次任务截止时间，(0,5m] |
 
 RAGENT_MODEL_TIMEOUT 是单次模型 HTTP 请求的超时；整次任务可能多次调用模型，所以另设任务超时。示例身份固定在程序中，模型参数只接受 order_id，不能切换租户或用户。
+
+## 统一配置结构
+
+统一加载入口为 internal/config.Load，配置分 Server、Model、Agent；组件接收配置值，不自行读取环境。当前健康服务允许模型三项全部为空；部分配置则必须完整合法。模型命令始终要求完整模型配置。所有配置段均在统一 Load 时检查。
+
+RAGENT_MODEL_MAX_COMPLETION_TOKENS：回答 token 上限，正整数，默认 256。按模型支持与回答长度调整；不修改已有真实 .env。

@@ -4,19 +4,28 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type ModelConfig struct {
-	BaseURL string
-	Model   string
-	APIKey  string
-	Timeout time.Duration
+	BaseURL             string
+	Model               string
+	APIKey              string
+	Timeout             time.Duration
+	MaxCompletionTokens int
 }
 
 func loadModel(getenv func(string) string) (ModelConfig, error) {
-	cfg := ModelConfig{BaseURL: strings.TrimSpace(getenv("RAGENT_MODEL_BASE_URL")), Model: strings.TrimSpace(getenv("RAGENT_MODEL_NAME")), APIKey: strings.TrimSpace(getenv("RAGENT_MODEL_API_KEY")), Timeout: 20 * time.Second}
+	cfg := ModelConfig{BaseURL: strings.TrimSpace(getenv("RAGENT_MODEL_BASE_URL")), Model: strings.TrimSpace(getenv("RAGENT_MODEL_NAME")), APIKey: strings.TrimSpace(getenv("RAGENT_MODEL_API_KEY")), Timeout: 20 * time.Second, MaxCompletionTokens: 256}
+	if value := getenv("RAGENT_MODEL_MAX_COMPLETION_TOKENS"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 {
+			return ModelConfig{}, errors.New("RAGENT_MODEL_MAX_COMPLETION_TOKENS must be a positive integer")
+		}
+		cfg.MaxCompletionTokens = n
+	}
 	if value := getenv("RAGENT_MODEL_TIMEOUT"); value != "" {
 		timeout, err := time.ParseDuration(value)
 		if err != nil {
@@ -37,6 +46,9 @@ func loadModel(getenv func(string) string) (ModelConfig, error) {
 }
 
 func (s ModelConfig) Validate() error {
+	if s.MaxCompletionTokens < 0 {
+		return errors.New("model completion token limit must not be negative")
+	}
 	if s.Model == "" {
 		return errors.New("RAGENT_MODEL_NAME is required")
 	}

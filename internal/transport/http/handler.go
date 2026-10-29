@@ -1,17 +1,18 @@
 package httptransport
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // NewHandler returns a Gin router for the application's existing http.Server.
 func NewHandler(logger *slog.Logger) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	router := gin.New()
 	router.HandleMethodNotAllowed = true
 	router.RedirectTrailingSlash = false
@@ -38,16 +39,4 @@ func NewHandler(logger *slog.Logger) http.Handler {
 		c.Status(http.StatusOK)
 	})
 	return router
-}
-
-func requestLog(logger *slog.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		started := time.Now()
-		requestID := rand.Text()
-		c.Header("X-Request-ID", requestID)
-		c.Next()
-		logger.InfoContext(c.Request.Context(), "http request completed",
-			"request_id", requestID, "method", c.Request.Method, "path", c.Request.URL.Path,
-			"status", c.Writer.Status(), "duration_ms", time.Since(started).Milliseconds())
-	}
 }

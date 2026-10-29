@@ -91,7 +91,9 @@ make agentcheck
 
 可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
 
-本课要求订单查询有工具执行与结果证据，模型直接给答案时返回错误而不展示为成功；这不能证明模型最终表述与证据完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
+执行器支持工具调用与无工具的澄清回答；订单提示词要求具体状态依据查询结果，程序目前不保证自然语言与结果完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
+
+当前职责与综合整改说明见 [应用架构基线](docs/ARCHITECTURE.md) 和 [第三课补充实践](docs/lessons/03c-architecture-refactor.md)。
 
 ## 项目结构
 
