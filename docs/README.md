@@ -12,7 +12,7 @@
 - [项目设计与能力地图](PROJECT.md)：最终范围、架构、边界、里程碑和验收要求。
 - [第 01 课：项目初始化与 Eino 兼容性验证](lessons/01-project-bootstrap.md)：代码与本地验收完成，真实模型正常调用已验证，待学员练习。
 - [第 02 课：基于 Eino ADK 的工具型 Agent](lessons/02-agent-and-tools.md)：本地实现与验收完成，真实工具调用联调待验证。
-- [第 03 课：API 与运行契约](lessons/03-api-and-run-contract.md)：契约初稿，待 OpenAPI 与实现。
+- [第 03 课：API 与运行契约](lessons/03-api-and-run-contract.md)：OpenAPI 与 SSE 示例完成，业务 HTTP 实现待后续课程。
 - [课程文档模板](lessons/TEMPLATE.md)：后续每课沿用的记录结构。
 
 ## 每课记录规则
@@ -44,3 +44,5 @@
 - [第 03 课补充实践：应用架构综合整改](lessons/03c-architecture-refactor.md)
 
 - [第 03 课补充实践：收敛 Agent 与用户上下文](lessons/03d-agent-user-context.md)（当前架构）
+
+- [接口文件与 SSE 帧说明](../api/README.md)

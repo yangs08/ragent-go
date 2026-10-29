@@ -1,6 +1,6 @@
 # 第 03 课：第一版 Agent HTTP 与运行契约
 
-更新：2026-10-29。状态：设计已按用户选择调整，业务 HTTP 接口尚未实现；第一、二课运行代码不变。
+更新：2026-10-29。状态：接口及 SSE 基准已固化到 api/agent.openapi.json，业务 HTTP 接口尚未实现；第一、二课运行代码不变。
 
 ## 1. 本课目标与决定
 
@@ -33,7 +33,7 @@ Ragent 将 Agent 与固定 RAG 分开：Agent 使用 /agent/v1，固定 RAG 使�
 
 首次提问不传 conversationId，由服务端生成会话；继续聊天时携带原 conversationId。每次执行生成新的 taskId。服务端通过首个 meta 事件回传 conversationId、taskId。前端保存会话标识，点击停止时提交本轮 taskId。
 
-身份来自认证上下文，不接受客户端指定 userId/tenantId。开始 SSE 前完成参数、认证、归属和并发检查；进入 SSE 后不能更换 HTTP 状态。非流式 Result 包装、业务错误码和各事件 payload 需继续逐项对照源码固化，当前不声称前端可直接兼容。
+身份来自认证上下文，不接受客户端指定 userId/tenantId。开始 SSE 前完成参数、认证、归属和并发检查。按 Ragent 的 GlobalExceptionHandler，业务异常使用 HTTP 200 + application/json + 非零 Result.code；客户端先判断响应类型。普通结果的 code/message/data/requestId、流内各事件字段和结束顺序见 [接口说明](../../api/README.md)。当前不声称前端可直接兼容。
 
 沿用 GET 是为了对照参考项目，记录其实际取舍：问题进入 URL，访问日志应去除查询参数；GET 发起执行时不能按普通可重试读取处理。前端必须禁用自动重连及自动重试，避免重复执行。后续如确需改为 POST，将单独说明需求、兼容和迁移方案。
 
@@ -74,7 +74,7 @@ Ragent 将 Agent 与固定 RAG 分开：Agent 使用 /agent/v1，固定 RAG 使�
 | done | 流结束 |
 | cancel | 用户取消 |
 
-第一阶段只实现已具备能力对应的事件，不伪造 reasoning 或审批能力。下一步需检查 sender、bridge、payload 和前端消费代码，明确正常、失败、取消与审批的事件顺序和结束条件，再固化 OpenAPI 及流示例。上表是源码事件清单，并非已完成的全量字段协议。
+第一阶段只实现已具备能力对应的事件，不伪造 reasoning 或审批能力。已核对 sender、bridge、payload、前端结果解包和调用路径，字段定义见 [OpenAPI](../../api/agent.openapi.json)，帧示例见 [接口说明](../../api/README.md)。正常 finish(NORMAL)→done；失败 message(error)→finish(INTERRUPTED)→done；取消 cancel→done；审批等待 confirm→done。finish 本身不表示执行成功。
 
 内部执行只有一个终态，但不能据此假定外部只发送一个结束事件；finish 与 done 的职责不同。内部 tool_call/tool_result/answer 经 HTTP 适配层转换到 Ragent 协议。
 
@@ -113,4 +113,12 @@ SSE 断开后不自动重连，不自动重发聊天请求。用户重新发送�
 
 思考：为什么请求 context 取消后，还需要独立的清理 context？为什么阻止同会话并发不等于幂等？为什么 heartbeats 不能保证瞬间检测断线？
 
-下一步继续核对 Ragent 的响应包装、事件 payload、收尾顺序与前端消费，固化接口示例和 OpenAPI，再进入 PostgreSQL、身份和运行记录实现。HTTP 接入时用主动关闭连接的测试验证下游取消，不能只看浏览器停止显示。
+本课接口文件与 SSE 示例已完成；下一课进入 PostgreSQL 工程集成，再接身份和会话数据。HTTP 服务化仍按第 07 课建设。HTTP 接入时用主动关闭连接的测试验证下游取消，不能只看浏览器停止显示。
+
+## 10. 本次交付与复盘
+
+新增 api/agent.openapi.json、api/README.md；明确流前 HTTP 200/JSON 业务错误、500 长度限制、Result、meta/message/block/hint/finish/cancel/confirm/done 字段及结束顺序，并补齐原草案漏掉的 /agent/v1/meta。所有未实现业务接口都标记 planned。
+
+本次仅修改契约与文档，不修改运行代码，不重复执行运行测试。完成 JSON 解析、内部引用、路径参数与 operationId 基础检查；未宣称经过专用 OpenAPI 工具的完整规范校验或真实接口验证。
+
+复盘：为什么 HTTP 200 不一定建流成功？为什么 finish 与 done 要分开？为什么请求 context 取消后，数据库收尾还需要独立且有期限的 context？为什么审批确认后的执行有新的 taskId？

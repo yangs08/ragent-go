@@ -1,0 +1,951 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ragent Go Agent API 契约",
+    "version": "0.1.0",
+    "description": "依据本地 Ragent 源码整理的实现基准。除 /healthz 外均未实现；认证随第 05 课落地。保留 Ragent 路径、camelCase 字段、Result 与 SSE 事件；不保证已与原前端完整兼容。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080"
+    }
+  ],
+  "security": [
+    {
+      "SessionToken": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "HTTP 存活检查",
+        "security": [],
+        "x-implementation-status": "implemented",
+        "responses": {
+          "200": {
+            "description": "进程可响应，不检查模型/数据库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/v1/chat": {
+      "get": {
+        "operationId": "chat",
+        "summary": "发起聊天；无 conversationId 时自动创建会话",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "07",
+        "responses": {
+          "200": {
+            "description": "流成功建立时为 SSE；建立前的业务错误为 JSON Result。不得仅检查 HTTP 200。",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: meta\ndata: {\"conversationId\":\"c1\",\"taskId\":\"t1\"}\n\nevent: message\ndata: {\"type\":\"answer\",\"delta\":\"请提供订单编号\"}\n\nevent: finish\ndata: {\"messageId\":\"m1\",\"title\":\"订单查询\",\"messageStatus\":\"NORMAL\",\"durationMs\":120}\n\nevent: done\ndata: [DONE]\n\n"
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "question",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "question 还必须非空白。首次 meta 返回 conversationId/taskId。GET 会启动执行，不得缓存、预取、自动重连或重试。请求断开触发取消。"
+      }
+    },
+    "/agent/v1/stop": {
+      "post": {
+        "operationId": "stop",
+        "summary": "停止当前用户的任务",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "07",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "description": "必须校验任务属主。成功表示停止请求已受理，不代表已撤销外部操作或下游立即停止。"
+      }
+    },
+    "/agent/v1/chat/confirm": {
+      "post": {
+        "operationId": "confirm",
+        "summary": "批准或拒绝待确认工具，并建立新 SSE",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "26",
+        "responses": {
+          "200": {
+            "description": "流成功建立时为 SSE；建立前的业务错误为 JSON Result。不得仅检查 HTTP 200。",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: meta\ndata: {\"conversationId\":\"c1\",\"taskId\":\"t1\"}\n\nevent: message\ndata: {\"type\":\"answer\",\"delta\":\"请提供订单编号\"}\n\nevent: finish\ndata: {\"messageId\":\"m1\",\"title\":\"订单查询\",\"messageStatus\":\"NORMAL\",\"durationMs\":120}\n\nevent: done\ndata: [DONE]\n\n"
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          }
+        },
+        "description": "审批绑定当前用户、会话和消息；续跑是新的 taskId。未实现审批能力前不注册此路由。"
+      }
+    },
+    "/agent/v1/conversations": {
+      "get": {
+        "operationId": "listConversations",
+        "summary": "当前用户会话列表",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "06",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/v1/conversations/{conversationId}/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "summary": "读取有权访问的会话消息",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "06",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageListResult"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "conversationId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/agent/v1/conversations/{conversationId}/title": {
+      "put": {
+        "operationId": "renameConversation",
+        "summary": "修改会话标题",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "06",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "conversationId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/agent/v1/conversations/{conversationId}": {
+      "delete": {
+        "operationId": "deleteConversation",
+        "summary": "删除有权访问的会话",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "06",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "conversationId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/agent/v1/conversations/batch-delete": {
+      "post": {
+        "operationId": "batchDeleteConversations",
+        "summary": "按当前用户授权批量删除会话",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "06",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/v1/meta": {
+      "get": {
+        "operationId": "agentMeta",
+        "summary": "返回实际引擎能力，不暴露密钥",
+        "x-implementation-status": "planned",
+        "x-delivery-stage": "07",
+        "responses": {
+          "200": {
+            "description": "JSON 结果；HTTP 200 不代表业务成功，必须检查 code。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineMetaResult"
+                }
+              }
+            }
+          }
+        },
+        "description": "字段参考 Ragent；framework 在 Go 版应如实返回 Eino，capabilities 只列已实现能力。"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SessionToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "参考 Ragent 前端直接发送登录 token 的约定；不是客户端 userId，不假定 Bearer 前缀。认证实现尚未提供。"
+      }
+    },
+    "schemas": {
+      "Result": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "0 成功；非 0 失败。参考 A000001 客户端错误、B000001 系统错误。"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "nullable": true
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "taskId"
+        ]
+      },
+      "MessageDelta": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "reasoning",
+              "error"
+            ]
+          },
+          "delta": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "delta"
+        ]
+      },
+      "Completion": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageStatus": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "INTERRUPTED"
+            ]
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "messageStatus"
+        ]
+      },
+      "Hint": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ]
+      },
+      "ConfirmField": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmCall": {
+        "type": "object",
+        "properties": {
+          "toolCallId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmField"
+            }
+          },
+          "arguments": {
+            "type": "string",
+            "description": "经授权、脱敏后展示的 JSON 参数字符串"
+          }
+        }
+      },
+      "Confirm": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmCall"
+            }
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "messageId",
+          "calls"
+        ]
+      },
+      "ConfirmRequest": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationId",
+          "messageId",
+          "approved"
+        ]
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "lastTime": {
+            "type": "string"
+          },
+          "turns": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "conversationId",
+          "title"
+        ]
+      },
+      "EngineMeta": {
+        "type": "object",
+        "properties": {
+          "framework": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "maxIters": {
+            "type": "integer"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toolProvider": {
+            "type": "string"
+          },
+          "mcpConfigured": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Block": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "reasoning",
+              "error",
+              "tool",
+              "confirm"
+            ]
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "toolCallId": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": "string"
+          },
+          "callIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "endedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationSource": {
+            "type": "string",
+            "enum": [
+              "tool",
+              "batch"
+            ]
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmCall"
+            }
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "ToolProgress": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "tool"
+            ]
+          },
+          "at": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "awaiting",
+              "done",
+              "failed",
+              "denied",
+              "interrupted"
+            ]
+          },
+          "result": {
+            "type": "string"
+          },
+          "toolCallId": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": "string"
+          },
+          "callIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "endedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationSource": {
+            "type": "string",
+            "enum": [
+              "tool",
+              "batch"
+            ]
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "仅终态出现；done=true，failed/denied/interrupted=false"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "status"
+        ]
+      },
+      "TextSeal": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "reasoning",
+              "error"
+            ]
+          },
+          "at": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "endedAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "thinkingContent": {
+            "type": "string",
+            "nullable": true
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            },
+            "nullable": true
+          },
+          "messageStatus": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "INTERRUPTED",
+              "AWAITING_CONFIRM"
+            ],
+            "nullable": true
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "createTime": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "content"
+        ]
+      },
+      "VoidResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "ConversationListResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MessageListResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "EngineMetaResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/EngineMeta"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "x-sse-events": {
+    "meta": {
+      "$ref": "#/components/schemas/Meta"
+    },
+    "message": {
+      "$ref": "#/components/schemas/MessageDelta"
+    },
+    "block": {
+      "oneOf": [
+        {
+          "$ref": "#/components/schemas/ToolProgress"
+        },
+        {
+          "$ref": "#/components/schemas/TextSeal"
+        }
+      ]
+    },
+    "hint": {
+      "$ref": "#/components/schemas/Hint"
+    },
+    "confirm": {
+      "$ref": "#/components/schemas/Confirm"
+    },
+    "finish": {
+      "$ref": "#/components/schemas/Completion"
+    },
+    "cancel": {
+      "$ref": "#/components/schemas/Completion"
+    },
+    "done": {
+      "type": "string",
+      "enum": [
+        "[DONE]"
+      ]
+    }
+  },
+  "x-sse-notes": [
+    "x-sse-events 是说明性扩展，不是标准 OpenAPI 流验证机制。",
+    "正常 finish(NORMAL) → done；失败 message(error) → finish(INTERRUPTED) → done；取消 cancel(INTERRUPTED) → done；等待确认 confirm → done。",
+    "取消若已形成待审批结果，Ragent 可走 confirm；断线不保证终帧送达。",
+    "流内不套 Result，不承诺 SSE id、Last-Event-ID、事件持久补发。"
+  ]
+}
