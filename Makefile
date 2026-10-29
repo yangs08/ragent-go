@@ -19,6 +19,7 @@ build:
 	$(GO) build -o bin/agentcheck ./cmd/agentcheck
 	$(GO) build -o bin/migrate ./cmd/migrate
 	$(GO) build -o bin/dbcheck ./cmd/dbcheck
+	$(GO) build -o bin/usercreate ./cmd/usercreate
 
 fmt:
 	$(GO) fmt ./...
@@ -50,3 +51,10 @@ migrate-status:
 
 dbcheck:
 	$(GO) run ./cmd/dbcheck
+
+.PHONY: user-create auth-smoke
+user-create:
+	$(GO) run ./cmd/usercreate -username "$(USERNAME)"
+
+auth-smoke: build
+	python3 scripts/auth_smoke.py

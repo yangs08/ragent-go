@@ -3,7 +3,7 @@
   "info": {
     "title": "Ragent Go Agent API 契约",
     "version": "0.1.0",
-    "description": "依据本地 Ragent 源码整理的实现基准。除 /healthz 外均未实现；认证随第 05 课落地。保留 Ragent 路径、camelCase 字段、Result 与 SSE 事件；不保证已与原前端完整兼容。"
+    "description": "Go 版实现基准。/healthz 已实现；数据库开启并迁移至版本2后提供 /auth/login、/auth/logout、/user/me；Agent 业务接口仍未实现。保留 Ragent 路径、camelCase、Result 与 SSE；不承诺原前端无需修改。"
   },
   "servers": [
     {
@@ -356,6 +356,92 @@
         },
         "description": "字段参考 Ragent；framework 在 Go 版应如实返回 Eino，capabilities 只列已实现能力。"
       }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "用户名密码登录",
+        "security": [],
+        "x-implementation-status": "implemented",
+        "x-delivery-stage": "05",
+        "description": "数据库开启且迁移版本>=2时注册；按真实 IP 限流；最多4KiB JSON。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功 code=0；失败仍为 HTTP 200，非零 code 且 data=null。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LoginResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AuthErrorResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "撤销当前登录会话",
+        "x-implementation-status": "implemented",
+        "x-delivery-stage": "05",
+        "responses": {
+          "200": {
+            "description": "成功 code=0；失败仍为 HTTP 200，非零 code 且 data=null。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/me": {
+      "get": {
+        "operationId": "currentUser",
+        "summary": "读取已认证用户",
+        "x-implementation-status": "implemented",
+        "x-delivery-stage": "05",
+        "responses": {
+          "200": {
+            "description": "成功 code=0；失败仍为 HTTP 200，非零 code 且 data=null。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CurrentUserResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AuthErrorResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -364,7 +450,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "参考 Ragent 前端直接发送登录 token 的约定；不是客户端 userId，不假定 Bearer 前缀。认证实现尚未提供。"
+        "description": "直接发送 /auth/login 返回的 token，不加 Bearer 前缀；不接受 query userId 指定身份。"
       }
     },
     "schemas": {
@@ -899,6 +985,135 @@
             "properties": {
               "data": {
                 "$ref": "#/components/schemas/EngineMeta"
+              }
+            }
+          }
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{2,63}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 72,
+            "format": "password",
+            "description": "服务端额外限制 UTF-8 编码不超过 72 字节，不会静默截断"
+          }
+        }
+      },
+      "LoginData": {
+        "type": "object",
+        "required": [
+          "userId",
+          "token"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "description": "原始 Authorization header token；仅登录时返回"
+          }
+        }
+      },
+      "CurrentUser": {
+        "type": "object",
+        "required": [
+          "userId",
+          "username"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "0"
+                ]
+              },
+              "data": {
+                "$ref": "#/components/schemas/LoginData"
+              }
+            }
+          }
+        ]
+      },
+      "CurrentUserResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "0"
+                ]
+              },
+              "data": {
+                "$ref": "#/components/schemas/CurrentUser"
+              }
+            }
+          }
+        ]
+      },
+      "AuthErrorResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "not": {
+                  "enum": [
+                    "0"
+                  ]
+                }
+              },
+              "data": {
+                "type": "object",
+                "nullable": true,
+                "enum": [
+                  null
+                ]
               }
             }
           }

@@ -6,10 +6,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"ragent-go/internal/config"
+	"ragent-go/internal/service"
 )
 
 // NewHandler returns a Gin router for the application's existing http.Server.
-func NewHandler(logger *slog.Logger) http.Handler {
+func NewHandler(logger *slog.Logger, auth *service.AuthService, cfg config.AuthConfig) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -38,5 +41,8 @@ func NewHandler(logger *slog.Logger) http.Handler {
 		c.Header("Content-Type", "application/json")
 		c.Status(http.StatusOK)
 	})
+	if auth != nil {
+		registerAuth(router, auth, cfg)
+	}
 	return router
 }

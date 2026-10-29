@@ -8,11 +8,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ragent-go/internal/config"
 )
 
 func TestHealthHandler(t *testing.T) {
 	var logs bytes.Buffer
-	handler := NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)))
+	handler := NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)), nil, config.AuthConfig{})
 	req := httptest.NewRequest(http.MethodGet, "/healthz?token=do-not-log", nil)
 	req.Header.Set("X-Request-ID", "untrusted-client-id")
 	response := httptest.NewRecorder()
@@ -40,7 +42,7 @@ func TestHealthHandler(t *testing.T) {
 }
 
 func TestHealthRoutes(t *testing.T) {
-	handler := NewHandler(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	handler := NewHandler(slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil, config.AuthConfig{})
 	for _, tt := range []struct {
 		method, path string
 		status       int

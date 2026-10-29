@@ -11,11 +11,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"ragent-go/internal/config"
 )
 
 func ginRouter(t *testing.T, output io.Writer) *gin.Engine {
 	t.Helper()
-	router, ok := NewHandler(slog.New(slog.NewJSONHandler(output, nil))).(*gin.Engine)
+	router, ok := NewHandler(slog.New(slog.NewJSONHandler(output, nil)), nil, config.AuthConfig{}).(*gin.Engine)
 	if !ok {
 		t.Fatal("HTTP handler must be backed by Gin")
 	}
@@ -29,7 +31,7 @@ func TestGinHealthProtocol(t *testing.T) {
 	}{{"GET", "/healthz", 200}, {"HEAD", "/healthz", 200}, {"POST", "/healthz", 405}, {"GET", "/healthz/", 404}} {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			var logs bytes.Buffer
-			handler := NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)))
+			handler := NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)), nil, config.AuthConfig{})
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(tt.method, tt.path, nil))
 			if response.Code != tt.want {

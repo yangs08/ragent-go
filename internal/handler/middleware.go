@@ -2,9 +2,10 @@ package handler
 
 import (
 	"crypto/rand"
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func requestLog(logger *slog.Logger) gin.HandlerFunc {

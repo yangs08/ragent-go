@@ -60,3 +60,16 @@ RAGENT_MODEL_MAX_COMPLETION_TOKENS：回答 token 上限，正整数，默认 25
 | RAGENT_DB_CONN_MAX_LIFETIME / CONN_MAX_IDLE_TIME | 30m / 5m |
 
 make db-up 通过 .env 取得专属本地容器参数；不要输出 docker compose config，避免将展开后的密码打印到日志。数据库迁移与事务实验见第四课。
+
+## 登录认证
+
+配置集中在 config.Auth；数据库开启且迁移至版本2后注册认证接口。不存在公开注册或预置密码。
+
+| 字段 | 默认值 | 作用 |
+|---|---|---|
+| RAGENT_AUTH_SESSION_TTL | 24h | 数据库会话有效期，1m..7d |
+| RAGENT_AUTH_REQUEST_TIMEOUT | 5s | 认证数据库请求期限，最长1m |
+| RAGENT_AUTH_LOGIN_WINDOW | 1m | 单实例每IP限流补充窗口，1s..1h |
+| RAGENT_AUTH_LOGIN_ATTEMPTS | 10 | 窗口补充次数与最大突发量，1..100 |
+
+RAGENT_USER_PASSWORD 仅供 usercreate 命令的自动化进程环境使用，不作为应用长期配置；交互运行会从终端不回显读取密码。不要把密码放进命令参数或提交到代码。

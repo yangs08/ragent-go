@@ -34,7 +34,7 @@ internal/bootstrap/server.go HTTP 生命周期
                                              按用户查询与授权
 ```
 
-工具只创建一次，不捕获当前用户。每轮 context 自然隔离身份；模型工具参数只有 order_id。当前 CLI 显式注入 alice，HTTP 尚未实现登录，不能把 WithUser 当作认证。
+工具只创建一次，不捕获当前用户。每轮 context 自然隔离身份；模型工具参数只有 order_id。当前 CLI 显式注入 alice，HTTP 登录已在第五课实现，不能把 WithUser 当作认证。
 
 Agent 包不强制所有任务必须登录；访问用户数据的工具在调用时要求可信用户。未来 HTTP 登录检查在中间件/应用服务执行，不能允许请求直接指定可信用户。
 
@@ -48,7 +48,7 @@ Agent 包不强制所有任务必须登录；访问用户数据的工具在调�
 
 ## 当前限制与下一阶段
 
-只有 /healthz HTTP 路由。聊天、认证、会话历史、业务会话表、主动停止、SSE 协议和跨实例治理尚未实现。第一版接口按 Ragent：GET /agent/v1/chat、POST /agent/v1/stop，断线取消，不自动重连。
+只有 /healthz HTTP 路由。聊天、会话历史、业务会话表、主动停止、SSE 协议和跨实例治理尚未实现。第一版接口按 Ragent：GET /agent/v1/chat、POST /agent/v1/stop，断线取消，不自动重连。
 
 优先实现真实调用链，再建立有实际用途的抽象；不预建 Service 容器、动态工具目录或租户系统。测试聚焦身份隔离、越权、取消与预算，不为目录与简单传参堆测试。
 
@@ -62,4 +62,10 @@ service 用于后续聊天与会话业务流程；当前尚无这条业务链，
 
 ## 第 04 课数据库接入
 
-新增 internal/database 的 GORM 连接初始化，配置仍在统一 config.Database 中；migrations 保存独立版本 SQL，cmd/migrate 显式执行，不由 HTTP 启动自动改表。数据库已验证，登录、会话与聊天 Service 尚未实现。详见 [第四课](lessons/04-postgresql-and-migrations.md)。
+新增 internal/database 的 GORM 连接初始化，配置仍在统一 config.Database 中；migrations 保存独立版本 SQL，cmd/migrate 显式执行，不由 HTTP 启动自动改表。数据库已验证，登录 AuthService 已在第五课实现，会话和聊天 Service 尚未实现。详见 [第四课](lessons/04-postgresql-and-migrations.md)。
+
+## 第 05 课认证接入
+
+internal/service/auth.go 直接使用 GORM，Handler 负责登录协议和认证中间件；common.User 增加 Username。启用数据库并迁移后提供 /auth/login、/auth/logout、/user/me，token 在 PostgreSQL 中只存摘要。现有示例工具的开发身份与真实账号 ID 分开，HTTP 聊天尚未接入。
+
+service 现在有真实认证流程，后续会话业务继续沿 Handler → Service → GORM；不新增空的仓储接口。详见 [第五课](lessons/05-login-and-user-context.md)。

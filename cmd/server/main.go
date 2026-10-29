@@ -15,6 +15,7 @@ import (
 	"ragent-go/internal/config"
 	"ragent-go/internal/database"
 	"ragent-go/internal/handler"
+	"ragent-go/internal/service"
 )
 
 func main() {
@@ -42,6 +43,7 @@ func runServer(ctx context.Context, getenv func(string) string, output io.Writer
 		return err
 	}
 	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: cfg.Server.LogLevel}))
+	var auth *service.AuthService
 	if cfg.Database.Enabled {
 		db, err := database.Open(ctx, cfg.Database)
 		if err != nil {
@@ -53,13 +55,17 @@ func runServer(ctx context.Context, getenv func(string) string, output io.Writer
 		}
 		defer pool.Close()
 		logger.Info("database connected")
+		auth, err = service.NewAuthService(ctx, db, cfg.Auth)
+		if err != nil {
+			return err
+		}
 	}
 	listener, err := net.Listen("tcp", cfg.Server.HTTPAddr)
 	if err != nil {
 		return err
 	}
 	logger.Info("server started", "address", listener.Addr().String())
-	err = bootstrap.Serve(ctx, listener, handler.NewHandler(logger), cfg.Server.ShutdownTimeout)
+	err = bootstrap.Serve(ctx, listener, handler.NewHandler(logger, auth, cfg.Auth), cfg.Server.ShutdownTimeout)
 	if err == nil {
 		logger.Info("server stopped gracefully")
 	}

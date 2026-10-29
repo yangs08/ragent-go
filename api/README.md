@@ -1,6 +1,6 @@
 # Agent HTTP 契约
 
-[agent.openapi.json](agent.openapi.json) 是 Go 版的实现基准，可导入支持 OpenAPI 3.0 的接口工具。只有 /healthz 已实现，其余路由用 x-implementation-status=planned 标记，x-delivery-stage 标明课程阶段。定义接口不等于开放接口。
+[agent.openapi.json](agent.openapi.json) 是 Go 版的实现基准，可导入支持 OpenAPI 3.0 的接口工具。/healthz 已实现；数据库开启并迁移至版本 2 后提供 /auth/login、/auth/logout、/user/me，其余路由用 x-implementation-status=planned 标记，x-delivery-stage 标明课程阶段。定义接口不等于开放接口。
 
 ## 已核对的源码
 
@@ -14,7 +14,7 @@ Ragent 的异常处理器保留 HTTP 200 + application/json + 非零业务 code�
 
 普通业务结果使用 code/message/data/requestId；允许可选字段和兼容附加字段。SSE 的每帧 payload 不套 Result。/healthz 保持现有响应，不是业务 Result。
 
-认证暂参考 Ragent 前端 Authorization 直接发送登录 token 的约定；当前 Go 没有登录接口或 token 校验，不能拿任意 token 调用尚未实现的接口。可信 userId 由服务端认证后写入 context，禁止从工具参数或聊天查询参数指定。
+认证暂参考 Ragent 前端 Authorization 直接发送登录 token 的约定；第五课已实现登录、数据库 token 校验和登出；需要使用服务端返回的真实 token，Agent 接口仍待实现。可信 userId 由服务端认证后写入 context，禁止从工具参数或聊天查询参数指定。
 
 ## SSE 示例
 
@@ -90,3 +90,5 @@ GET /agent/v1/chat 会执行任务，禁止缓存、预取、自动重试和自�
 Handler 解析 HTTP、调用 Service、输出 SSE。AgentChatService 取得可信用户，校验/创建会话、加载历史、管理同会话占用、生成 taskId、组织执行与结算；Agent 只负责 Eino 循环。会话和认证尚未落地，先按第 04–06 课补齐这些真实依赖，第 07 课接通 SSE；本课不增加占位 Service。
 
 OpenAPI 只描述请求与响应，不能约束 SSE 帧的时间顺序；x-sse-events 是说明性扩展，流协议以本文和实际集成验证共同验收。不声称已与 Ragent 前端完全兼容。
+
+认证实现与字段差异详见 [第五课](../docs/lessons/05-login-and-user-context.md)。

@@ -13,6 +13,7 @@ type Config struct {
 	Model    ModelConfig
 	Agent    AgentConfig
 	Database DatabaseConfig
+	Auth     AuthConfig
 }
 
 type ServerConfig struct {
@@ -69,5 +70,9 @@ func Load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Server: server, Model: model, Agent: agent, Database: database}, nil
+	auth, err := loadAuth(getenv)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{Server: server, Model: model, Agent: agent, Database: database, Auth: auth}, nil
 }

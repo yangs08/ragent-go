@@ -7,8 +7,11 @@ import (
 )
 
 // User is populated by trusted entry-point code, not model arguments.
-// The development CLI supplies its user explicitly; login is not implemented.
-type User struct{ ID string }
+// HTTP authentication supplies this value after token verification.
+type User struct {
+	ID       string `json:"userId"`
+	Username string `json:"username"`
+}
 type key struct{}
 
 func WithUser(ctx context.Context, user User) context.Context {

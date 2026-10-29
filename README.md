@@ -19,7 +19,7 @@
 - Eino 真实适配器的独立模型验证命令，包含流式消费、整体超时和取消。
 - 本地模拟供应商集成测试，不需要真实 API Key。
 
-HTTP 服务目前仅提供健康检查，订单 Agent 通过独立 CLI 演示。尚无正式认证、聊天 API、持久会话和管理后台，后续按课程添加。
+HTTP 服务目前仅提供健康检查，订单 Agent 通过独立 CLI 演示。认证已在第五课接入；尚无聊天 API、持久聊天会话和管理后台，后续按课程添加。
 
 ## 工具链与依赖
 
@@ -123,4 +123,10 @@ make migrate-status
 make dbcheck
 ```
 
-使用独立 SQL 迁移，不在应用启动时 AutoMigrate。当前本机连接、重复迁移、事务回滚与数据库启用后的服务退出已验证。数据库健康不是 /healthz 的检查内容，登录与会话业务仍待实现。详见 [第四课](docs/lessons/04-postgresql-and-migrations.md)。
+使用独立 SQL 迁移，不在应用启动时 AutoMigrate。当前本机连接、重复迁移、事务回滚与数据库启用后的服务退出已验证。数据库健康不是 /healthz 的检查内容，登录已在第五课接入，聊天会话仍待实现。详见 [第四课](docs/lessons/04-postgresql-and-migrations.md)。
+
+## 第五课：登录认证
+
+数据库开启并执行 make migrate 后，可用 make user-create USERNAME=alice 创建账号，终端输入密码不回显。make run 提供 POST /auth/login、POST /auth/logout、GET /user/me；Authorization 直接传登录返回的 token。登录结果沿用 HTTP 200 + 业务 code，检查 code 是否为字符串 "0"。
+
+可执行 make auth-smoke 验证本项目专属容器中的真实认证链路，会自动清理随机测试账号。角色与用户管理后台尚未实现，细节见 [第五课](docs/lessons/05-login-and-user-context.md)。
