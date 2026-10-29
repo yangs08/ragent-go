@@ -86,7 +86,7 @@ func TestOrderAgentActualADKLoop(t *testing.T) {
 				toolResponse(w, fmt.Sprintf(`{"order_id":%q}`, tt.id))
 			}, testOptions())
 			var output bytes.Buffer
-			if err := agent.Run(context.Background(), "查询订单 "+tt.id, &output); err != nil {
+			if err := agent.Run(context.Background(), "查询订单 "+tt.id, jsonSink(&output)); err != nil {
 				t.Fatal(err)
 			}
 			if calls.Load() != 2 {
@@ -118,7 +118,7 @@ func TestOrderAgentActualADKLoop(t *testing.T) {
 func TestOrderAgentRequiresToolEvidence(t *testing.T) {
 	agent, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) { answerResponse(w, "我已经查过，订单已完成") }, testOptions())
 	var output bytes.Buffer
-	err := agent.Run(context.Background(), "查订单 A100", &output)
+	err := agent.Run(context.Background(), "查订单 A100", jsonSink(&output))
 	if !errors.Is(err, ErrNoToolEvidence) || strings.Contains(output.String(), "我已经查过") {
 		t.Fatalf("error=%v output=%s", err, output.String())
 	}
@@ -150,7 +150,7 @@ func TestOrderAgentLimitsAndSafeProviderErrors(t *testing.T) {
 					toolResponse(w, `{"order_id":"A100"}`)
 				}
 			}, opts)
-			err := agent.Run(context.Background(), "查订单", io.Discard)
+			err := agent.Run(context.Background(), "查订单", jsonSink(io.Discard))
 			if err == nil || strings.Contains(err.Error(), "private-provider-detail") {
 				t.Fatalf("error=%v", err)
 			}
@@ -178,7 +178,7 @@ func TestOrderAgentCancellationAndDeadline(t *testing.T) {
 			if kind == "cancel" {
 				cancel()
 			}
-			err := agent.Run(ctx, "查订单", io.Discard)
+			err := agent.Run(ctx, "查订单", jsonSink(io.Discard))
 			want := context.DeadlineExceeded
 			if kind == "cancel" {
 				want = context.Canceled
@@ -195,13 +195,13 @@ type failingOutput struct{}
 func (failingOutput) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 func TestOrderAgentInputAndOutputErrors(t *testing.T) {
 	agent, _ := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) { toolResponse(w, `{"order_id":"A100"}`) }, testOptions())
-	if err := agent.Run(context.Background(), " ", io.Discard); err == nil {
+	if err := agent.Run(context.Background(), " ", jsonSink(io.Discard)); err == nil {
 		t.Fatal("empty question accepted")
 	}
 	if err := agent.Run(context.Background(), "查订单", nil); err == nil {
 		t.Fatal("nil output accepted")
 	}
-	if err := agent.Run(context.Background(), "查订单", failingOutput{}); !errors.Is(err, io.ErrClosedPipe) {
+	if err := agent.Run(context.Background(), "查订单", jsonSink(failingOutput{})); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatalf("error=%v", err)
 	}
 	if _, err := NewOrderAgent(nil, tooling.DemoOrders(), tooling.Principal{TenantID: "acme", UserID: "alice"}, testOptions()); err == nil {
@@ -214,5 +214,29 @@ func TestOrderAgentInputAndOutputErrors(t *testing.T) {
 	}
 	if _, err := NewOrderAgent(agent.model, nil, tooling.Principal{}, testOptions()); err == nil {
 		t.Fatal("invalid tool dependencies accepted")
+	}
+}
+
+// Serialization belongs to the consumer, including consumers used in integration tests.
+func jsonSink(output io.Writer) EventSink {
+	encoder := json.NewEncoder(output)
+	return func(event Event) error { return encoder.Encode(event) }
+}
+
+func TestOrderAgentSinkFailureStopsExecution(t *testing.T) {
+	agent, calls := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) {
+		toolResponse(w, `{"order_id":"A100"}`)
+	}, testOptions())
+	sentinel := errors.New("consumer stopped")
+	count := 0
+	err := agent.Run(context.Background(), "查 A100", func(event Event) error {
+		count++
+		if event.Type != "tool_call" {
+			t.Errorf("first event=%+v", event)
+		}
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) || count != 1 || calls.Load() != 1 {
+		t.Fatalf("error=%v events=%d model calls=%d", err, count, calls.Load())
 	}
 }
