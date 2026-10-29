@@ -115,7 +115,7 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 internal/tooling/order.go          订单查询工具、可信身份、只读模拟数据
 internal/tooling/order_test.go     Schema、参数与资源隔离验证
 internal/agent/order_agent.go      ADK 装配、运行、事件与执行证据检查
-internal/agent/options.go          Agent 预算配置
+internal/config/agent.go           Agent 配置（第三课整改后统一管理）
 internal/agent/*_test.go           真实 ADK + 本地协议服务测试
 internal/model/client.go           复用 NewClient，单次模型请求超时
 cmd/agentcheck/                    读取 .env 并装配演示 Agent
