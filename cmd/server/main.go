@@ -13,7 +13,7 @@ import (
 
 	"ragent-go/internal/bootstrap"
 	"ragent-go/internal/config"
-	httptransport "ragent-go/internal/transport/http"
+	"ragent-go/internal/handler"
 )
 
 func main() {
@@ -46,7 +46,7 @@ func runServer(ctx context.Context, getenv func(string) string, output io.Writer
 		return err
 	}
 	logger.Info("server started", "address", listener.Addr().String())
-	err = bootstrap.Serve(ctx, listener, httptransport.NewHandler(logger), cfg.Server.ShutdownTimeout)
+	err = bootstrap.Serve(ctx, listener, handler.NewHandler(logger), cfg.Server.ShutdownTimeout)
 	if err == nil {
 		logger.Info("server stopped gracefully")
 	}

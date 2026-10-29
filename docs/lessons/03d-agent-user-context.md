@@ -16,13 +16,13 @@ Java 使用 TransmittableThreadLocal；Go 使用 context.Context 随调用传递
 ## 当前实现
 
 ```go
-ctx = usercontext.WithUser(ctx, usercontext.User{ID: "alice"})
+ctx = common.WithUser(ctx, common.User{ID: "alice"})
 assistant, err := agent.New(client, tools, definition, cfg.Agent)
 // 检查 err 后执行
 err = assistant.Run(ctx, question, emit)
 ```
 
-工具在装配时创建并注册一次，调用时用 usercontext.RequireUser(ctx) 获取本次用户。模型 Schema 只有 order_id，不能通过参数选择用户。没有用户的数据查询直接拒绝。同一个工具分别在 alice、bob 的上下文中运行，不改变工具对象字段。
+工具在装配时创建并注册一次，调用时用 common.RequireUser(ctx) 获取本次用户。模型 Schema 只有 order_id，不能通过参数选择用户。没有用户的数据查询直接拒绝。同一个工具分别在 alice、bob 的上下文中运行，不改变工具对象字段。
 
 User 目前只包含 ID；没有租户需求时不强制增加 TenantID。原 C300 示例改为另一个用户的订单，不再宣称已有多租户隔离。最终项目的租户能力若需要，将在实际授权与数据模型课程明确实现。
 
@@ -43,3 +43,7 @@ User 目前只包含 ID；没有租户需求时不强制增加 TenantID。原 C3
 ## 复盘
 
 为什么配置可以共享，当前用户必须在请求上下文中？为什么 Go 不能用进程全局变量模拟 UserContext？为什么工具定义不需要按用户重建？为什么没有必要给一个订单示例建立完整业务模块？
+
+## 目录收敛
+
+HTTP 文件由 internal/transport/http 移到 internal/handler，用户辅助函数由 internal/usercontext 移到 internal/common/user.go；代码调用使用 common.WithUser / common.RequireUser。只调整组织，不改变身份隔离、工具授权或 HTTP 行为。service 随聊天业务实现再创建，本轮不增加占位接口与空服务。

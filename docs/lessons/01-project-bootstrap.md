@@ -29,7 +29,7 @@ ragent-go/
   cmd/modelcheck/                 独立 Eino 模型联调入口与测试
   internal/config/               服务配置与校验
   internal/bootstrap/            HTTP 运行与退出生命周期
-  internal/transport/http/       路由、健康检查、请求日志
+  internal/handler/       路由、健康检查、请求日志
   internal/model/                模型配置与 Eino 流式适配验证
   configs/README.md              .env 与环境变量说明
   .env / .env.example            本机配置（忽略提交）/无凭据模板
@@ -100,7 +100,7 @@ SHA-256: dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2
 
 ### 5.2 HTTP：健康检查不代表所有业务就绪
 
-再读 `internal/transport/http/handler.go`。
+再读 `internal/handler/handler.go`。
 
 - `/healthz` 表示 HTTP 进程能响应；未检查模型或数据库。
 - 服务端生成 X-Request-ID，不直接信任客户端传入的任意字符串。
@@ -294,9 +294,9 @@ Gin Engine 实现 http.Handler，因此可以交给已有 bootstrap.Serve；不�
 ### 代码阅读顺序
 
 1. `cmd/server/main.go`：进程入口设置 Gin release 模式；runServer 继续按原方式装配。
-2. `internal/transport/http/handler.go`：用 gin.New 显式注册中间件和 GET/HEAD 路由，返回值仍是 http.Handler。
+2. `internal/handler/handler.go`：用 gin.New 显式注册中间件和 GET/HEAD 路由，返回值仍是 http.Handler。
 3. `internal/bootstrap/server.go`：没有改动，继续负责停止接收请求、限时等待和强制关闭。
-4. `internal/transport/http/gin_test.go`：观察框架迁移怎样用行为测试控制差异。
+4. `internal/handler/gin_test.go`：观察框架迁移怎样用行为测试控制差异。
 
 `*gin.Context` 是路由和中间件上下文，与标准库 context.Context 职责不同。同步调用下游时使用 c.Request.Context()；不得把会被复用的 *gin.Context 直接留给后台任务。后续 Run 的后台执行生命周期需要单独设计。
 

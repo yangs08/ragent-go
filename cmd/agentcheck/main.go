@@ -13,10 +13,10 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 
 	"ragent-go/internal/agent"
+	"ragent-go/internal/common"
 	"ragent-go/internal/config"
 	"ragent-go/internal/example"
 	"ragent-go/internal/model"
-	"ragent-go/internal/usercontext"
 )
 
 func main() {
@@ -58,7 +58,7 @@ func runOrderCheck(ctx context.Context, getenv func(string) string, output io.Wr
 		question = "查询 A100 订单的状态，请先调用订单工具再回答。"
 	}
 	encoder := json.NewEncoder(output)
-	ctx = usercontext.WithUser(ctx, usercontext.User{ID: "alice"})
+	ctx = common.WithUser(ctx, common.User{ID: "alice"})
 	return assistant.Run(ctx, question, func(event agent.Event) error {
 		return encoder.Encode(event)
 	})

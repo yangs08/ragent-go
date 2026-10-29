@@ -18,9 +18,9 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
+	"ragent-go/internal/common"
 	"ragent-go/internal/config"
 	"ragent-go/internal/example"
-	"ragent-go/internal/usercontext"
 )
 
 type providerRequest struct {
@@ -314,7 +314,7 @@ func TestAgentSharedToolsUseCurrentUser(t *testing.T) {
 		toolResponse(w, `{"order_id":"A100"}`)
 	}, testOptions())
 	for _, tt := range []struct{ user, code string }{{"alice", "ok"}, {"bob", "not_found"}, {"alice", "ok"}} {
-		ctx := usercontext.WithUser(context.Background(), usercontext.User{ID: tt.user})
+		ctx := common.WithUser(context.Background(), common.User{ID: tt.user})
 		code := ""
 		err := assistant.Run(ctx, "查询 A100", func(e Event) error {
 			if e.Type == "tool_result" {
@@ -358,5 +358,5 @@ func TestExecutorSupportsOtherToolsWithoutExposingResultsByDefault(t *testing.T)
 }
 
 func aliceContext() context.Context {
-	return usercontext.WithUser(context.Background(), usercontext.User{ID: "alice"})
+	return common.WithUser(context.Background(), common.User{ID: "alice"})
 }

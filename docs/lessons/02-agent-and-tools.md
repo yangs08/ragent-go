@@ -116,7 +116,7 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 ```text
 cmd/agentcheck/main.go         配置、模型、工具装配和 CLI 输出
 internal/agent/agent.go        Agent 定义、通用运行、事件与预算
-internal/usercontext/user.go  当前请求用户的 context 存取
+internal/common/user.go  当前请求用户的 context 存取
 internal/example/order.go     示例订单工具与本地数据
 internal/config/agent.go      集中管理的执行配置
 ```

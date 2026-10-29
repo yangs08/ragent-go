@@ -13,11 +13,11 @@ Go 保留相同原则：模型与工具集中装配，本轮身份放入 context
 ```text
 cmd/agentcheck/main.go        配置、模型与示例工具装配，注入开发用户，JSONL 输出
 internal/agent/agent.go       Agent 定义、Eino 执行、预算与事件
-internal/usercontext/user.go  简单 User 与 context 存取函数
+internal/common/user.go  简单 User 与 context 存取函数
 internal/example/order.go    本地订单示例、工具定义、数据与查询
 internal/config/             Server/Model/Agent 统一配置
 internal/model/              模型适配与文本流回调
-internal/transport/http/     Gin 健康检查和中间件
+internal/handler/     Gin 健康检查和中间件
 internal/bootstrap/server.go HTTP 生命周期
 ```
 
@@ -29,7 +29,7 @@ internal/bootstrap/server.go HTTP 生命周期
 启动：配置 → 模型 + 注册工具列表 → agent.New
 执行：ctx（可信用户） + question → Agent.Run → Eino → 工具
                                                        ↓
-                                      usercontext.RequireUser(ctx)
+                                      common.RequireUser(ctx)
                                                        ↓
                                              按用户查询与授权
 ```
@@ -53,3 +53,9 @@ Agent 包不强制所有任务必须登录；访问用户数据的工具在调�
 优先实现真实调用链，再建立有实际用途的抽象；不预建 Service 容器、动态工具目录或租户系统。测试聚焦身份隔离、越权、取消与预算，不为目录与简单传参堆测试。
 
 过程说明见 [本课：Agent 与用户上下文收敛](lessons/03d-agent-user-context.md)。
+
+## 目录约定
+
+HTTP 入口统一使用 handler，不保留 transport/http 两级结构；用户上下文是 common/user.go 中的简单辅助函数，不单列业务模块。common 仅放实际共享的小型基础类型/函数，不集中业务逻辑或全局可变状态。
+
+service 用于后续聊天与会话业务流程；当前尚无这条业务链，暂不建立空目录。Handler 负责协议与输入，Service 协调业务，Agent 负责 Eino 执行；示例工具只依赖 common 中的标准 context 辅助函数，不依赖 Gin。

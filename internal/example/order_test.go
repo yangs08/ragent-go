@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"ragent-go/internal/usercontext"
+	"ragent-go/internal/common"
 )
 
 type storeStub struct {
@@ -176,5 +176,5 @@ func TestDemoOrdersRespectsContextAndUser(t *testing.T) {
 }
 
 func aliceContext() context.Context {
-	return usercontext.WithUser(context.Background(), usercontext.User{ID: "alice"})
+	return common.WithUser(context.Background(), common.User{ID: "alice"})
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	"ragent-go/internal/usercontext"
+	"ragent-go/internal/common"
 )
 
 type orderInput struct {
@@ -75,7 +75,7 @@ func queryOrder(ctx context.Context, store OrderStore, id string) (OrderResult, 
 	if err := ctx.Err(); err != nil {
 		return OrderResult{}, err
 	}
-	user, err := usercontext.RequireUser(ctx)
+	user, err := common.RequireUser(ctx)
 	if err != nil {
 		return OrderResult{}, err
 	}
