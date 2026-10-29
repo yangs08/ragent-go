@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -49,5 +51,11 @@ func runOrderCheck(ctx context.Context, getenv func(string) string, output io.Wr
 	if question == "" {
 		question = "查询 A100 订单的状态，请先调用订单工具再回答。"
 	}
-	return orderAgent.Run(ctx, question, output)
+	if output == nil {
+		return errors.New("agent output is required")
+	}
+	encoder := json.NewEncoder(output)
+	return orderAgent.Run(ctx, question, func(event agent.Event) error {
+		return encoder.Encode(event)
+	})
 }

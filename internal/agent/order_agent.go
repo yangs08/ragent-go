@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -36,6 +35,10 @@ type Event struct {
 	Content string               `json:"content,omitempty"`
 }
 
+// EventSink consumes events synchronously and in order. Returning an error stops
+// this execution. Run never invokes the sink after returning.
+type EventSink func(Event) error
+
 type OrderAgent struct {
 	model     einomodel.BaseChatModel
 	orderTool tool.InvokableTool
@@ -56,11 +59,11 @@ func NewOrderAgent(model einomodel.BaseChatModel, store tooling.OrderStore, prin
 	return &OrderAgent{model: model, orderTool: orderTool, options: options}, nil
 }
 
-// Run uses ADK for the decision/action loop and emits complete JSONL events.
+// Run uses ADK for the decision/action loop and emits typed events.
 // The constructor is reusable; all mutable execution state is local to this run.
-func (a *OrderAgent) Run(ctx context.Context, question string, output io.Writer) error {
-	if strings.TrimSpace(question) == "" || output == nil {
-		return errors.New("agent question and output are required")
+func (a *OrderAgent) Run(ctx context.Context, question string, emit EventSink) error {
+	if strings.TrimSpace(question) == "" || emit == nil {
+		return errors.New("agent question and event sink are required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, a.options.Timeout)
 	defer cancel()
@@ -81,7 +84,6 @@ func (a *OrderAgent) Run(ctx context.Context, question string, output io.Writer)
 	}
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: engine, EnableStreaming: false})
 	events := runner.Query(ctx, question)
-	encoder := json.NewEncoder(output)
 	pending := make(map[string]string)
 	answer := ""
 	results := 0
@@ -113,7 +115,7 @@ func (a *OrderAgent) Run(ctx context.Context, question string, output io.Writer)
 			if err := json.Unmarshal([]byte(message.Content), &result); err != nil {
 				return ErrRunFailed
 			}
-			if err := encoder.Encode(Event{Type: "tool_result", Tool: name, CallID: message.ToolCallID, Result: &result}); err != nil {
+			if err := emit(Event{Type: "tool_result", Tool: name, CallID: message.ToolCallID, Result: &result}); err != nil {
 				return err
 			}
 			results++
@@ -131,7 +133,7 @@ func (a *OrderAgent) Run(ctx context.Context, question string, output io.Writer)
 			}
 			pending[call.ID] = call.Function.Name
 			// Raw model arguments may contain rejected sensitive fields; do not print them.
-			if err := encoder.Encode(Event{Type: "tool_call", Tool: call.Function.Name, CallID: call.ID}); err != nil {
+			if err := emit(Event{Type: "tool_call", Tool: call.Function.Name, CallID: call.ID}); err != nil {
 				return err
 			}
 		}
@@ -151,7 +153,7 @@ func (a *OrderAgent) Run(ctx context.Context, question string, output io.Writer)
 	if len(pending) != 0 {
 		return ErrRunFailed
 	}
-	return encoder.Encode(Event{Type: "answer", Content: answer})
+	return emit(Event{Type: "answer", Content: answer})
 }
 
 func (a *OrderAgent) safeError(ctx context.Context, tool *budgetedTool) error {

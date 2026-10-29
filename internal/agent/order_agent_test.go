@@ -240,3 +240,43 @@ func TestOrderAgentSinkFailureStopsExecution(t *testing.T) {
 		t.Fatalf("error=%v events=%d model calls=%d", err, count, calls.Load())
 	}
 }
+
+func TestOrderAgentConcurrentRunsHaveIndependentBudgets(t *testing.T) {
+	opts := testOptions()
+	opts.MaxToolCalls = 1
+	agent, calls := newTestAgent(t, func(w http.ResponseWriter, r *http.Request) {
+		var req providerRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+			return
+		}
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			answerResponse(w, "已查询")
+			return
+		}
+		toolResponse(w, `{"order_id":"A100"}`)
+	}, opts)
+	const runs = 4
+	results := make(chan error, runs)
+	for i := 0; i < runs; i++ {
+		go func() {
+			var types []string
+			err := agent.Run(context.Background(), "查 A100", func(event Event) error {
+				types = append(types, event.Type)
+				return nil
+			})
+			if err == nil && strings.Join(types, ",") != "tool_call,tool_result,answer" {
+				err = fmt.Errorf("events=%v", types)
+			}
+			results <- err
+		}()
+	}
+	for i := 0; i < runs; i++ {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls.Load() != runs*2 {
+		t.Fatalf("model calls=%d", calls.Load())
+	}
+}
