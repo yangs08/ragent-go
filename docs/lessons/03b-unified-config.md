@@ -5,18 +5,16 @@
 
 ## 目标与 Ragent 对照
 
-配置来源、默认值、解析和合法性校验由 internal/config 统一管理。Ragent 使用 Spring 将配置段绑定到 AgentProperties 等类型，再注入组件。Go 版本使用启动层加载与构造函数传参：同样集中管理、按模块分组，不复制 Spring 容器。
+配置来源、默认值、解析和合法性校验由 internal/bootstrap/config.go 统一管理。Ragent 使用 Spring 将配置段绑定到 AgentProperties 等类型，再注入组件。Go 版本使用启动层加载与构造函数传参：同样集中管理、按模块分组，不复制 Spring 容器。
 
 原有问题是 config.Load、model.LoadSettings、agent.LoadOptions 分散解析环境配置。现在只有 config.Load 对调用方公开加载入口。
 
 ## 当前结构
 
 ```text
-internal/config/
-  environment.go   .env 与系统环境变量合并
-  config.go        Config、ServerConfig 与统一 Load
-  model.go         ModelConfig、模型配置解析与校验
-  agent.go         AgentConfig、Agent 配置解析与校验
+internal/bootstrap/config.go  配置结构、.env/YAML 加载、默认值与校验
+configs/*.yaml            按业务拆分的普通配置
+.env                      密钥与环境覆盖（不提交）
 ```
 
 ```go
@@ -70,3 +68,7 @@ executor, err := agent.NewExecutor(client, catalog, definition, cfg.Agent)
 本课只调整配置体系。订单示例、用户身份生命周期与聊天应用服务仍按 ARCHITECTURE.md 继续整改。
 
 后续更新：订单业务与执行身份的整改已完成，见 [综合整改](03c-architecture-refactor.md)。ModelConfig 另增加 MaxCompletionTokens，默认 256。
+
+后续组织调整：普通配置改为 YAML + .env 分层，入口统一 Boot，全局共享启动资源，Result 集中到 common。见 [05a](05a-boot-config-response.md)，旧初始化代码片段按历史阶段理解。
+
+最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

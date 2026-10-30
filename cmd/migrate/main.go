@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"github.com/pressly/goose/v3"
-	"github.com/pressly/goose/v3/lock"
 	"log/slog"
 	"os"
 	"os/signal"
-	"ragent-go/internal/config"
-	"ragent-go/internal/database"
-	"ragent-go/migrations"
 	"syscall"
 	"time"
+
+	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/lock"
+
+	"ragent-go/internal/bootstrap"
+	"ragent-go/migrations"
 )
 
 func main() {
@@ -30,23 +31,20 @@ func run(ctx context.Context, command string) error {
 	if command != "status" && command != "up" {
 		return errors.New("supported migration commands: status, up")
 	}
-	getenv, err := config.Environment(".env", os.LookupEnv)
+	cleanup, err := bootstrap.Boot(ctx)
 	if err != nil {
 		return err
 	}
-	cfg, err := config.Load(getenv)
-	if err != nil {
-		return err
+	defer cleanup()
+	if bootstrap.DB == nil {
+		return errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
 	}
-	db, err := database.Open(ctx, cfg.Database)
-	if err != nil {
-		return err
-	}
+	db := bootstrap.DB
 	pool, err := db.DB()
 	if err != nil {
 		return errors.New("database pool unavailable")
 	}
-	defer pool.Close()
+
 	locker, err := lock.NewPostgresSessionLocker()
 	if err != nil {
 		return errors.New("initialize migration lock failed")

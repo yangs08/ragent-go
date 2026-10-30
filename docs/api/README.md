@@ -87,8 +87,8 @@ GET /agent/v1/chat 会执行任务，禁止缓存、预取、自动重试和自�
 
 ## 实现时的 service 职责
 
-Handler 解析 HTTP、调用 Service、输出 SSE。AgentChatService 取得可信用户，校验/创建会话、加载历史、管理同会话占用、生成 taskId、组织执行与结算；Agent 只负责 Eino 循环。会话和认证尚未落地，先按第 04–06 课补齐这些真实依赖，第 07 课接通 SSE；本课不增加占位 Service。
+Controller 解析 HTTP、调用 Service、输出 SSE。AgentChatService 取得可信用户，校验/创建会话、加载历史、管理同会话占用、生成 taskId、组织执行与结算；Agent 只负责 Eino 循环。会话和认证尚未落地，先按第 04–06 课补齐这些真实依赖，第 07 课接通 SSE；本课不增加占位 Service。
 
 OpenAPI 只描述请求与响应，不能约束 SSE 帧的时间顺序；x-sse-events 是说明性扩展，流协议以本文和实际集成验证共同验收。不声称已与 Ragent 前端完全兼容。
 
-认证实现与字段差异详见 [第五课](../docs/lessons/05-login-and-user-context.md)。
+认证实现与字段差异详见 [第五课](../lessons/05-login-and-user-context.md)。

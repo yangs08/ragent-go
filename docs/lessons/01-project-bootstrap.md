@@ -27,9 +27,9 @@ HTTP：配置 → 日志/监听器装配 → /healthz → 请求标识 → SIGTE
 ragent-go/
   cmd/server/                     HTTP 进程入口与装配测试
   cmd/modelcheck/                 独立 Eino 模型联调入口与测试
-  internal/config/               服务配置与校验
+  internal/bootstrap/config.go                服务配置与校验
   internal/bootstrap/            HTTP 运行与退出生命周期
-  internal/handler/       路由、健康检查、请求日志
+  internal/controller/       路由、健康检查、请求日志
   internal/model/                模型配置与 Eino 流式适配验证
   configs/README.md              .env 与环境变量说明
   .env / .env.example            本机配置（忽略提交）/无凭据模板
@@ -85,7 +85,7 @@ SHA-256: dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2
 
 ### 5.1 配置：错误尽量在启动时发现
 
-先读 `internal/config/config.go` 和 `cmd/server/main.go`。
+先读 `internal/bootstrap/config.go` 和 `cmd/server/main.go`。
 
 - 入口用 `Environment(".env", os.LookupEnv)` 构建配置读取函数；使用 godotenv v1.5.1 解析文件，系统环境变量优先。
 - `Load(getenv)` 接收该读取函数，负责类型解析与字段校验；测试可以使用字典，不依赖真实配置或凭据。
@@ -94,13 +94,13 @@ SHA-256: dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2
 - 默认 `127.0.0.1:8080`，仅本机可访问。
 - 配置通过后再创建日志和监听器，最后进入 Serve。
 
-先读 `internal/config/environment.go`，再读 `config.go`。加载器返回读取闭包，不修改进程环境；文件内容不在错误中回显。真实 `.env` 被 Git 忽略，模板 `.env.example` 不包含真实凭据。
+先读 `internal/bootstrap/config.go`，再读 `config.go`。加载器返回读取闭包，不修改进程环境；文件内容不在错误中回显。真实 `.env` 被 Git 忽略，模板 `.env.example` 不包含真实凭据。
 
 应用配置中不直接持有全局单例。注入读取函数让测试无需修改真实环境，也避免某个业务包悄悄读取不同配置。
 
 ### 5.2 HTTP：健康检查不代表所有业务就绪
 
-再读 `internal/handler/handler.go`。
+再读 `internal/controller/handler.go`。
 
 - `/healthz` 表示 HTTP 进程能响应；未检查模型或数据库。
 - 服务端生成 X-Request-ID，不直接信任客户端传入的任意字符串。
@@ -294,9 +294,9 @@ Gin Engine 实现 http.Handler，因此可以交给已有 bootstrap.Serve；不�
 ### 代码阅读顺序
 
 1. `cmd/server/main.go`：进程入口设置 Gin release 模式；runServer 继续按原方式装配。
-2. `internal/handler/handler.go`：用 gin.New 显式注册中间件和 GET/HEAD 路由，返回值仍是 http.Handler。
+2. `internal/controller/handler.go`：用 gin.New 显式注册中间件和 GET/HEAD 路由，返回值仍是 http.Handler。
 3. `internal/bootstrap/server.go`：没有改动，继续负责停止接收请求、限时等待和强制关闭。
-4. `internal/handler/gin_test.go`：观察框架迁移怎样用行为测试控制差异。
+4. `internal/controller/gin_test.go`：观察框架迁移怎样用行为测试控制差异。
 
 `*gin.Context` 是路由和中间件上下文，与标准库 context.Context 职责不同。同步调用下游时使用 c.Request.Context()；不得把会被复用的 *gin.Context 直接留给后台任务。后续 Run 的后台执行生命周期需要单独设计。
 
@@ -360,3 +360,5 @@ curl -i -X POST http://127.0.0.1:8080/healthz
 ## 11. 第一课 Git 提交
 
 2026-10-28，本地 main 分支提交 `c607fe7`：`feat: bootstrap lesson one with Gin and Eino`。提交 23 个文件，包含第一课代码、测试、依赖锁定和运行说明。提交前测试、vet、进程冒烟与依赖校验均通过，暂存差异检查通过；提交后代码仓库工作区干净。真实 .env、.idea、缓存、覆盖率和构建产物均未纳入 Git。该次提交时课程文档保存在独立目录；现已迁入项目 docs/ 并随 Git 版本管理。
+
+最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

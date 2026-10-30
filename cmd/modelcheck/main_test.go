@@ -7,12 +7,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestRunCheckMissingConfig(t *testing.T) {
-	if err := runCheck(context.Background(), func(string) string { return "" }, io.Discard); err == nil {
+	setupEnvironment(t, nil)
+	if err := runCheck(context.Background(), "", io.Discard); err == nil {
 		t.Fatal("expected config error")
 	}
 }
@@ -28,15 +30,30 @@ data: [DONE]
 	}))
 	defer server.Close()
 	env := map[string]string{"RAGENT_MODEL_BASE_URL": server.URL + "/v1", "RAGENT_MODEL_NAME": "test", "RAGENT_MODEL_API_KEY": "test"}
+	setupEnvironment(t, env)
 	var output bytes.Buffer
-	if err := runCheck(context.Background(), func(k string) string { return env[k] }, &output); err != nil {
+	if err := runCheck(context.Background(), "", &output); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(output.String(), "local response") {
 		t.Fatalf("output=%s", output.String())
 	}
-	env["RAGENT_MODEL_PROMPT"] = "custom prompt"
-	if err := runCheck(context.Background(), func(k string) string { return env[k] }, io.Discard); err != nil {
+
+	if err := runCheck(context.Background(), "custom prompt", io.Discard); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func setupEnvironment(t *testing.T, values map[string]string) {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	for _, item := range os.Environ() {
+		key, _, _ := strings.Cut(item, "=")
+		if strings.HasPrefix(key, "RAGENT_") {
+			t.Setenv(key, "")
+		}
+	}
+	for key, value := range values {
+		t.Setenv(key, value)
 	}
 }

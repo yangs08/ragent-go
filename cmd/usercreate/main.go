@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -11,8 +12,7 @@ import (
 
 	"golang.org/x/term"
 
-	"ragent-go/internal/config"
-	"ragent-go/internal/database"
+	"ragent-go/internal/bootstrap"
 	"ragent-go/internal/service"
 )
 
@@ -25,13 +25,8 @@ func main() {
 	}
 }
 func run(username string) error {
-	getenv, err := config.Environment(".env", os.LookupEnv)
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Load(getenv)
-	if err != nil {
-		return err
+	if username == "" {
+		return errors.New("username is required; use -username")
 	}
 	password := os.Getenv("RAGENT_USER_PASSWORD")
 	if password == "" {
@@ -45,20 +40,17 @@ func run(username string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	db, err := database.Open(ctx, cfg.Database)
+	cleanup, err := bootstrap.Boot(ctx)
 	if err != nil {
 		return err
 	}
-	pool, err := db.DB()
-	if err != nil {
-		return err
+	defer cleanup()
+	if bootstrap.DB == nil {
+		return errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
 	}
-	defer pool.Close()
-	auth, err := service.NewAuthService(ctx, db, cfg.Auth)
-	if err != nil {
-		return err
-	}
-	id, err := auth.CreateUser(ctx, username, password)
+
+	users := service.UserService{}
+	id, err := users.Create(ctx, username, password)
 	if err != nil {
 		return err
 	}

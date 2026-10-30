@@ -17,7 +17,7 @@ Ragent 的 application.yaml 配置 PostgreSQL 数据源，UserDO 使用 MyBatis-
 ## 当前文件与调用关系
 
 ```text
-internal/config/database.go  数据库配置与校验
+internal/bootstrap/config.go  数据库配置与校验
 internal/database/postgres.go GORM 初始化与连接池配置
 migrations/00001_create_users.sql 第一份结构迁移
 migrations/embed.go          将 SQL 嵌入迁移命令
@@ -90,7 +90,7 @@ status 依赖 Goose 的版本表，初次状态访问可能初始化版本元数
 
 ## 阅读顺序与练习
 
-先读 config/database.go，再读 database/postgres.go，然后看迁移 SQL、migrate 命令、dbcheck 命令，最后看 server 的连接与 defer Close。
+先读 bootstrap/config.go，再读 database/postgres.go，然后看迁移 SQL、migrate 命令、dbcheck 命令，最后看 server 的连接与 defer Close。
 
 练习：执行 make migrate-status 和 make dbcheck，解释结果；再解释为什么不能每请求 gorm.Open、为什么开启事务后必须用 tx、为什么更新密码配置不会改变持久卷中的角色、为什么 /healthz 不等于业务就绪。
 
@@ -100,3 +100,7 @@ status 依赖 Goose 的版本表，初次状态访问可能初始化版本元数
 
 - [GORM 数据库与连接池](https://gorm.io/docs/connecting_to_the_database.html)
 - [Goose Provider、迁移与 session lock](https://pressly.github.io/goose/documentation/provider/)
+
+后续组织调整：普通配置改为 YAML + .env 分层，入口统一 Boot，全局共享启动资源，Result 集中到 common。见 [05a](05a-boot-config-response.md)，旧初始化代码片段按历史阶段理解。
+
+最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

@@ -1,14 +1,16 @@
-package handler
+package middleware
 
 import (
 	"crypto/rand"
-	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"ragent-go/internal/bootstrap"
 )
 
-func requestLog(logger *slog.Logger) gin.HandlerFunc {
+func RequestLog() gin.HandlerFunc {
+	logger := bootstrap.Logger
 	return func(c *gin.Context) {
 		started := time.Now()
 		requestID := rand.Text()

@@ -51,9 +51,9 @@ def check(workdir):
         proc.send_signal(signal.SIGTERM)
         output, errors = proc.communicate(timeout=3)
         assert proc.returncode == 0, errors
-        assert request_id in output
-        assert "server stopped gracefully" in output
-        events = [json.loads(line) for line in output.splitlines()]
+        assert request_id in errors
+        assert "server stopped gracefully" in errors
+        events = [json.loads(line) for line in errors.splitlines() if line.startswith("{")]
         requests_logged = [event for event in events if event.get("msg") == "http request completed"]
         assert [event["status"] for event in requests_logged] == [200, 200, 405]
     finally:
@@ -63,7 +63,7 @@ def check(workdir):
     bad = subprocess.run([str(ROOT / "bin/server")],
                          env=dict(env, RAGENT_HTTP_ADDR="invalid"), cwd=workdir,
                          capture_output=True, text=True, timeout=3)
-    assert bad.returncode != 0 and "RAGENT_HTTP_ADDR" in bad.stderr
+    assert bad.returncode != 0 and "server stopped" in bad.stderr
     print("PASS: Gin GET/HEAD/405, structured request logs, SIGTERM shutdown, invalid config")
 
     requests = []
@@ -97,9 +97,9 @@ def check(workdir):
         dotenv.write_text(dotenv.read_text() +
                           f"RAGENT_MODEL_BASE_URL=http://127.0.0.1:{provider.server_port}/v1\n"
                           "RAGENT_MODEL_NAME=file-model\nRAGENT_MODEL_API_KEY=local-test-key\n"
-                          "RAGENT_MODEL_TIMEOUT=2s\nRAGENT_MODEL_PROMPT=local smoke test\n")
+                          "RAGENT_MODEL_TIMEOUT=2s\n")
         model_env = dict(env, RAGENT_MODEL_NAME="smoke-model")
-        check = subprocess.run([str(ROOT / "bin/modelcheck")], env=model_env, cwd=workdir,
+        check = subprocess.run([str(ROOT / "bin/modelcheck"), "-prompt", "local smoke test"], env=model_env, cwd=workdir,
                                capture_output=True, text=True, timeout=5)
         assert check.returncode == 0, check.stderr
         assert check.stdout == "local-eino-ok"

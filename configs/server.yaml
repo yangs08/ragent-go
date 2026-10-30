@@ -1,0 +1,4 @@
+# Public server configuration. Secrets belong in .env.
+http_addr: 127.0.0.1:8080
+shutdown_timeout: 5s
+log_level: INFO

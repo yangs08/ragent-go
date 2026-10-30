@@ -38,10 +38,10 @@ agentcheck:
 
 .PHONY: db-up db-stop migrate migrate-status dbcheck
 db-up:
-	docker compose --env-file .env -f deploy/compose.yaml up -d --wait postgres
+	$(GO) run ./cmd/dbdev -command up
 
 db-stop:
-	docker compose --env-file .env -f deploy/compose.yaml stop postgres
+	$(GO) run ./cmd/dbdev -command stop
 
 migrate:
 	$(GO) run ./cmd/migrate -command up

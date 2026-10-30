@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"gorm.io/gorm"
 	"log/slog"
 	"os"
-	"ragent-go/internal/config"
-	"ragent-go/internal/database"
 	"time"
+
+	"gorm.io/gorm"
+
+	"ragent-go/internal/bootstrap"
 )
 
 func main() {
@@ -19,25 +20,18 @@ func main() {
 	}
 }
 func run() error {
-	getenv, err := config.Environment(".env", os.LookupEnv)
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Load(getenv)
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	db, err := database.Open(ctx, cfg.Database)
+	cleanup, err := bootstrap.Boot(ctx)
 	if err != nil {
 		return err
 	}
-	pool, err := db.DB()
-	if err != nil {
-		return errors.New("database pool unavailable")
+	defer cleanup()
+	if bootstrap.DB == nil {
+		return errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
 	}
-	defer pool.Close()
+	db := bootstrap.DB
+
 	marker := rand.Text()
 	rollback := errors.New("intentional rollback")
 	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

@@ -18,8 +18,8 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	"ragent-go/internal/common"
-	"ragent-go/internal/config"
+	functions "ragent-go/internal/common"
+	"ragent-go/internal/define"
 	"ragent-go/internal/example"
 )
 
@@ -33,7 +33,7 @@ type providerRequest struct {
 	} `json:"messages"`
 }
 
-func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentConfig) (*Agent, *atomic.Int32) {
+func newTestAgent(t *testing.T, handler http.HandlerFunc, options define.AgentConfig) (*Agent, *atomic.Int32) {
 	t.Helper()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -55,8 +55,8 @@ func newTestAgent(t *testing.T, handler http.HandlerFunc, options config.AgentCo
 	}
 	return agent, &calls
 }
-func testOptions() config.AgentConfig {
-	return config.AgentConfig{MaxIterations: 4, MaxToolCalls: 3, Timeout: time.Second}
+func testOptions() define.AgentConfig {
+	return define.AgentConfig{MaxIterations: 4, MaxToolCalls: 3, Timeout: time.Second}
 }
 func toolResponse(w http.ResponseWriter, args string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -220,11 +220,6 @@ func TestOrderAgentInputAndOutputErrors(t *testing.T) {
 	if _, err := New(nil, agent.tools, agent.definition, testOptions()); err == nil {
 		t.Fatal("nil model accepted")
 	}
-	for _, opts := range []config.AgentConfig{{}, {MaxIterations: 21, MaxToolCalls: 3, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 21, Timeout: time.Second}, {MaxIterations: 4, MaxToolCalls: 3, Timeout: 6 * time.Minute}} {
-		if _, err := New(agent.model, agent.tools, agent.definition, opts); err == nil {
-			t.Fatal("invalid options accepted")
-		}
-	}
 	if _, err := New(agent.model, agent.tools, Definition{}, testOptions()); err == nil {
 		t.Fatal("invalid definition accepted")
 	}
@@ -314,7 +309,7 @@ func TestAgentSharedToolsUseCurrentUser(t *testing.T) {
 		toolResponse(w, `{"order_id":"A100"}`)
 	}, testOptions())
 	for _, tt := range []struct{ user, code string }{{"alice", "ok"}, {"bob", "not_found"}, {"alice", "ok"}} {
-		ctx := common.WithUser(context.Background(), common.User{ID: tt.user})
+		ctx := functions.WithUser(context.Background(), define.User{ID: tt.user})
 		code := ""
 		err := assistant.Run(ctx, "查询 A100", func(e Event) error {
 			if e.Type == "tool_result" {
@@ -358,5 +353,5 @@ func TestExecutorSupportsOtherToolsWithoutExposingResultsByDefault(t *testing.T)
 }
 
 func aliceContext() context.Context {
-	return common.WithUser(context.Background(), common.User{ID: "alice"})
+	return functions.WithUser(context.Background(), define.User{ID: "alice"})
 }

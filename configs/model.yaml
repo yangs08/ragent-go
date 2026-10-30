@@ -1,0 +1,5 @@
+# Public model configuration. Secrets belong in .env.
+base_url: ""
+name: ""
+timeout: 20s
+max_completion_tokens: 256

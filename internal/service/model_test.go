@@ -1,4 +1,4 @@
-package model
+package service
 
 import (
 	"bytes"
@@ -9,13 +9,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"ragent-go/internal/config"
 	"strings"
 	"testing"
 	"time"
+
+	"ragent-go/internal/define"
 )
 
-func TestStreamTextUsesRealEinoAdapter(t *testing.T) {
+func TestStreamModelTextUsesRealEinoAdapter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" || r.Method != "POST" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
@@ -46,7 +47,7 @@ data: [DONE]
 	}))
 	defer server.Close()
 	var output bytes.Buffer
-	err := streamConfigured(context.Background(), config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: time.Second}, "你好", &output)
+	err := streamConfigured(context.Background(), define.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: time.Second}, "你好", &output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ data: [DONE]
 	}
 }
 
-func TestStreamTextFailureAndCancellation(t *testing.T) {
+func TestStreamModelTextFailureAndCancellation(t *testing.T) {
 	for _, kind := range []string{"provider error", "midstream error", "deadline", "cancelled"} {
 		t.Run(kind, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +83,7 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 				}
 			}))
 			defer server.Close()
-			cfg := config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: 100 * time.Millisecond}
+			cfg := define.ModelConfig{BaseURL: server.URL + "/v1", Model: "test-model", APIKey: "test-key", Timeout: 100 * time.Millisecond}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			if kind == "cancelled" {
@@ -106,7 +107,7 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 					t.Fatalf("error=%v", err)
 				}
 			default:
-				if !errors.Is(err, ErrProvider) {
+				if !errors.Is(err, ErrModelProvider) {
 					t.Fatalf("error=%v", err)
 				}
 			}
@@ -117,11 +118,11 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 	}
 }
 
-func TestStreamTextRejectsEmptyInput(t *testing.T) {
-	if err := streamConfigured(context.Background(), config.ModelConfig{}, " ", io.Discard); err == nil {
+func TestStreamModelTextRejectsEmptyInput(t *testing.T) {
+	if err := streamConfigured(context.Background(), define.ModelConfig{}, " ", io.Discard); err == nil {
 		t.Fatal("expected error")
 	}
-	cfg := config.ModelConfig{BaseURL: "https://model.example/v1", Model: "x", APIKey: "x", Timeout: time.Second}
+	cfg := define.ModelConfig{BaseURL: "https://model.example/v1", Model: "x", APIKey: "x", Timeout: time.Second}
 	cfg.Timeout = 0
 	if err := streamConfigured(context.Background(), cfg, "hello", io.Discard); err == nil {
 		t.Fatal("expected settings error")
@@ -136,14 +137,14 @@ type shortWriter struct{}
 
 func (shortWriter) Write(p []byte) (int, error) { return 0, nil }
 
-func TestStreamTextEmptyAndOutputFailures(t *testing.T) {
+func TestStreamModelTextEmptyAndOutputFailures(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		writer  io.Writer
 		want    error
 		content string
 	}{
-		{"empty", io.Discard, ErrEmptyResponse, ""},
+		{"empty", io.Discard, ErrEmptyModelResponse, ""},
 		{"writer error", brokenWriter{}, io.ErrClosedPipe, "hello"},
 		{"short write", shortWriter{}, io.ErrShortWrite, "hello"},
 	} {
@@ -155,7 +156,7 @@ func TestStreamTextEmptyAndOutputFailures(t *testing.T) {
 				_, _ = fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", data)
 			}))
 			defer server.Close()
-			cfg := config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: time.Second}
+			cfg := define.ModelConfig{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: time.Second}
 			err := streamConfigured(context.Background(), cfg, "hello", tt.writer)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("error=%v, want %v", err, tt.want)
@@ -164,20 +165,10 @@ func TestStreamTextEmptyAndOutputFailures(t *testing.T) {
 	}
 }
 
-func TestNewClientValidatesSettings(t *testing.T) {
-	if _, err := NewClient(context.Background(), config.ModelConfig{}); err == nil {
-		t.Fatal("invalid client settings accepted")
-	}
-	cfg := config.ModelConfig{BaseURL: "http://127.0.0.1:12345/v1", Model: "test", APIKey: "test", Timeout: time.Second}
-	if _, err := NewClient(context.Background(), cfg); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestNewClientHonorsTimeout(t *testing.T) {
+func TestNewModelClientHonorsTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.Copy(io.Discard, r.Body); <-r.Context().Done() }))
 	defer server.Close()
-	client, err := NewClient(context.Background(), config.ModelConfig{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: 30 * time.Millisecond})
+	client, err := NewModelClient(context.Background(), define.ModelConfig{BaseURL: server.URL + "/v1", Model: "test", APIKey: "test", Timeout: 30 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,14 +180,14 @@ func TestNewClientHonorsTimeout(t *testing.T) {
 	}
 }
 
-func streamConfigured(ctx context.Context, cfg config.ModelConfig, prompt string, output io.Writer) error {
-	client, err := NewClient(ctx, cfg)
+func streamConfigured(ctx context.Context, cfg define.ModelConfig, prompt string, output io.Writer) error {
+	client, err := NewModelClient(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return StreamText(ctx, client, prompt, func(text string) error {
+	return StreamModelText(ctx, client, prompt, func(text string) error {
 		n, err := io.WriteString(output, text)
 		if err != nil {
 			return err

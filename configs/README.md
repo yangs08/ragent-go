@@ -1,75 +1,44 @@
-# 配置说明
+# 配置与结构体映射
 
-启动时读取当前工作目录的 `.env`，本地请从项目根目录执行 `make run` / `make modelcheck`。
+configs/ 保存按模块拆分的可提交 YAML，.env 保存密钥与部署覆盖。字段和默认值声明在 internal/define/config.go，通用加载逻辑在 internal/bootstrap/config.go。
 
-优先级为：系统环境变量 > `.env` > 程序默认值。显式存在的空环境变量也会覆盖文件值，之后再按对应字段的默认/必填规则处理。文件不存在时继续使用系统环境变量与默认值；文件不可读或语法错误时失败，错误信息不回显内容。
+```text
+configs/
+  server.yaml      HTTP、日志
+  database.yaml    数据库普通连接参数与池
+  model.yaml       模型普通配置
+  agent.yaml       Agent 执行预算
+  auth.yaml        登录会话与限流
+```
 
-使用 godotenv v1.5.1 解析为配置映射，不修改进程全局环境；支持常用引号与注释语法。`.env` 已被 Git 忽略，本地文件权限为 0600；`.env.example` 可提交且不含真实密钥。运行时不会自动展开 shell 命令，也不要使用 `source .env` 加载。
+每份文件直接写字段，不再包 server/agent 等根节点。define.Config 的 yaml 标签决定文件名，字段的 yaml 标签决定键；新增模块在 Config 加一个声明并提供同名 YAML，不改加载器。
 
-| 环境变量 | 默认值 | 含义 |
-|---|---|---|
-| RAGENT_HTTP_ADDR | 127.0.0.1:8080 | HTTP 监听地址，必须显式包含 host 和 1..65535 的端口 |
-| RAGENT_SHUTDOWN_TIMEOUT | 5s | 停止服务时等待在途请求，范围 (0,1m] |
-| RAGENT_LOG_LEVEL | INFO | slog 日志级别 |
+## 声明即映射
 
-`/healthz` 只表示 HTTP 进程可响应，未检查模型、数据库或其他依赖。不把它当成业务就绪检查。
+```go
+type AgentConfig struct {
+    MaxIterations int `yaml:"max_iterations" env:"RAGENT_AGENT_MAX_ITERATIONS" envDefault:"4"`
+}
+```
 
-## 独立模型验证命令
+YAML 由 yaml.v3 直接解码，环境覆盖和默认值由 github.com/caarlos0/env/v11 映射。只需在结构体增加字段和标签、在对应 YAML 填值，不写 loadAgent 或字段转换表。必要业务检查放在实际使用处，不预设配置 Validate。
 
-| 环境变量 | 默认值 | 含义 |
-|---|---|---|
-| RAGENT_MODEL_BASE_URL | 无，必填 | 兼容接口根路径；HTTPS，仅回环地址允许 HTTP |
-| RAGENT_MODEL_NAME | 无，必填 | 模型标识 |
-| RAGENT_MODEL_API_KEY | 无，必填 | 通过安全环境注入 |
-| RAGENT_MODEL_TIMEOUT | 20s | 整次流式调用截止时间，范围 (0,5m] |
-| RAGENT_MODEL_PROMPT | 请用一句话解释什么是 Agent。 | 联调输入 |
+优先级：系统环境变量 > .env > YAML > envDefault。现有 .env 未重写，里面原来的普通字段仍会覆盖 YAML。显式空环境变量盖掉低优先级来源，再使用该字段程序默认值或留空，由校验判断必填；不会复活 .env 中被清空的密钥。
 
-Base URL 禁止内嵌凭据、查询参数或 fragment。该命令仅用于开发联调，不在 HTTP 服务开放收费模型调用入口。
+model.yaml 不允许 api_key，database.yaml 不允许 password：密钥字段 yaml:"-"，只从 RAGENT_MODEL_API_KEY / RAGENT_DB_PASSWORD 读取。未知字段、类型错误、多份 YAML 文档会拒绝加载，错误不回显值。文件缺失时允许默认值/环境覆盖，兼容诊断二进制；正式部署应携带受审查的 YAML。
 
-## 第二课订单 Agent
+联调问题使用 modelcheck/agentcheck 的 -prompt 参数，不再提供 Diagnostics 配置，也不再读取 RAGENT_MODEL_PROMPT / RAGENT_AGENT_PROMPT。
 
-`make agentcheck` 读取同一 .env 与模型配置，不需要第二份密钥。
+## Boot 与资源
 
-| 环境变量 | 默认值 | 含义 |
-|---|---|---|
-| RAGENT_AGENT_PROMPT | 查询 A100 订单的状态，请先调用订单工具再回答。 | 本次任务 |
-| RAGENT_AGENT_MAX_ITERATIONS | 4 | 模型决策轮数上限，1..20 |
-| RAGENT_AGENT_MAX_TOOL_CALLS | 3 | 实际工具执行次数预算，1..20，每次运行独立 |
-| RAGENT_AGENT_TIMEOUT | 30s | 整次任务截止时间，(0,5m] |
+bootstrap/boot.go 声明 Config、DB、Logger，并由 bootstrap.Boot(ctx) 统一初始化。Service 从 bootstrap.DB / bootstrap.Config 取得资源，运行期间只读；用户身份与事务仍分别在请求 context 和局部 tx 中。停止请求和后台工作后执行 Boot 返回的 cleanup。
 
-RAGENT_MODEL_TIMEOUT 是单次模型 HTTP 请求的超时；整次任务可能多次调用模型，所以另设任务超时。CLI 通过 context 注入开发用户 alice；工具调用时读取本次用户，模型参数只接受 order_id，不能指定身份。
+没有 global 目录；define/ 只按业务放共享配置、认证请求/结果与返回结构，不负责打开连接或启动服务。数据库适配器依赖 define.DatabaseConfig，避免 common 和初始化代码循环依赖。
 
-## 统一配置结构
+## 本地数据库工具
 
-统一加载入口为 internal/config.Load，配置分 Server、Model、Agent；组件接收配置值，不自行读取环境。当前健康服务允许模型三项全部为空；部分配置则必须完整合法。模型命令始终要求完整模型配置。所有配置段均在统一 Load 时检查。
+make db-up / make db-stop 调用 cmd/dbdev，使用 common.LoadConfig 读取同一配置，再通过子进程环境交给 Compose。此工具只装载配置，不先连接尚未启动的数据库；其他应用命令统一 Boot。
 
-RAGENT_MODEL_MAX_COMPLETION_TOKENS：回答 token 上限，正整数，默认 256。按模型支持与回答长度调整；不修改已有真实 .env。
+默认数据库127.0.0.1:15432、库ragent_go、用户ragent，database.enabled=false。密码必填才能创建容器，改变配置不会自动更新已有数据卷的角色密码。不要输出 docker compose config，以免打印密码。初始化、迁移与登录参考第四、第五课。
 
-## PostgreSQL
-
-统一字段 config.Database。模板默认 RAGENT_DB_ENABLED=false，仅健康检查时不依赖数据库。启用后启动失败即停止，不自动忽略数据库错误。
-
-| 字段 | 默认值 |
-|---|---|
-| RAGENT_DB_HOST / PORT | 127.0.0.1 / 15432 |
-| RAGENT_DB_NAME / USER | ragent_go / ragent |
-| RAGENT_DB_PASSWORD | 无；启用时必填，禁止提交 |
-| RAGENT_DB_SSLMODE | disable；仅回环允许，远程要求 verify-full |
-| RAGENT_DB_MAX_OPEN_CONNS / MAX_IDLE_CONNS | 10 / 5 |
-| RAGENT_DB_CONNECT_TIMEOUT | 5s |
-| RAGENT_DB_CONN_MAX_LIFETIME / CONN_MAX_IDLE_TIME | 30m / 5m |
-
-make db-up 通过 .env 取得专属本地容器参数；不要输出 docker compose config，避免将展开后的密码打印到日志。数据库迁移与事务实验见第四课。
-
-## 登录认证
-
-配置集中在 config.Auth；数据库开启且迁移至版本2后注册认证接口。不存在公开注册或预置密码。
-
-| 字段 | 默认值 | 作用 |
-|---|---|---|
-| RAGENT_AUTH_SESSION_TTL | 24h | 数据库会话有效期，1m..7d |
-| RAGENT_AUTH_REQUEST_TIMEOUT | 5s | 认证数据库请求期限，最长1m |
-| RAGENT_AUTH_LOGIN_WINDOW | 1m | 单实例每IP限流补充窗口，1s..1h |
-| RAGENT_AUTH_LOGIN_ATTEMPTS | 10 | 窗口补充次数与最大突发量，1..100 |
-
-RAGENT_USER_PASSWORD 仅供 usercreate 命令的自动化进程环境使用，不作为应用长期配置；交互运行会从终端不回显读取密码。不要把密码放进命令参数或提交到代码。
+数据库实体放 internal/model，AI 客户端放 common/model_client.go，共享函数在 internal/common/functions.go。日志统一写 stderr。

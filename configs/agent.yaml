@@ -1,0 +1,4 @@
+# Public agent configuration. Secrets belong in .env.
+max_iterations: 4
+max_tool_calls: 3
+timeout: 30s

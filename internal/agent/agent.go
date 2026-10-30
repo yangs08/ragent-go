@@ -13,7 +13,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"ragent-go/internal/config"
+	"ragent-go/internal/define"
 )
 
 var ErrRunFailed = errors.New("agent execution failed; check provider tool support and execution limits")
@@ -36,15 +36,12 @@ type Agent struct {
 	model      einomodel.BaseChatModel
 	tools      []tool.InvokableTool
 	definition Definition
-	cfg        config.AgentConfig
+	cfg        define.AgentConfig
 }
 
-func New(model einomodel.BaseChatModel, tools []tool.InvokableTool, definition Definition, cfg config.AgentConfig) (*Agent, error) {
+func New(model einomodel.BaseChatModel, tools []tool.InvokableTool, definition Definition, cfg define.AgentConfig) (*Agent, error) {
 	if model == nil {
 		return nil, errors.New("agent model is required")
-	}
-	if err := cfg.Validate(); err != nil {
-		return nil, err
 	}
 	if strings.TrimSpace(definition.Name) == "" || strings.TrimSpace(definition.Instruction) == "" {
 		return nil, errors.New("agent name and instruction are required")

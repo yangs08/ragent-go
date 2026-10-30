@@ -46,4 +46,4 @@ User 目前只包含 ID；没有租户需求时不强制增加 TenantID。原 C3
 
 ## 目录收敛
 
-HTTP 文件由 internal/transport/http 移到 internal/handler，用户辅助函数由 internal/usercontext 移到 internal/common/user.go；代码调用使用 common.WithUser / common.RequireUser。只调整组织，不改变身份隔离、工具授权或 HTTP 行为。service 随聊天业务实现再创建，本轮不增加占位接口与空服务。
+HTTP 文件由 internal/transport/http 移到 internal/controller，用户辅助函数由 internal/usercontext 移到 internal/common/user.go；代码调用使用 common.WithUser / common.RequireUser。只调整组织，不改变身份隔离、工具授权或 HTTP 行为。service 随聊天业务实现再创建，本轮不增加占位接口与空服务。

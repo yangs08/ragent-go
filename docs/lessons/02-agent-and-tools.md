@@ -118,7 +118,7 @@ cmd/agentcheck/main.go         配置、模型、工具装配和 CLI 输出
 internal/agent/agent.go        Agent 定义、通用运行、事件与预算
 internal/common/user.go  当前请求用户的 context 存取
 internal/example/order.go     示例订单工具与本地数据
-internal/config/agent.go      集中管理的执行配置
+internal/bootstrap/config.go      集中管理的执行配置
 ```
 
 顺序阅读入口装配 → Agent 执行 → 示例工具 → 用户上下文。详见 [当前收敛实践](03d-agent-user-context.md)。
@@ -263,3 +263,5 @@ make smoke 会在临时目录创建自己的 .env、本地模型协议服务与�
 接口依据：已锁定版本中的 [ADK ChatModelAgent](https://github.com/cloudwego/eino/blob/v0.9.22/adk/chatmodel.go)、[Runner](https://github.com/cloudwego/eino/blob/v0.9.22/adk/runner.go)、[工具辅助组件](https://github.com/cloudwego/eino/blob/v0.9.22/components/tool/utils/invokable_func.go)。本课具体保证以应用代码和测试为准，框架存在机制不等于应用已自动获得完整业务保障。
 
 当前设计已移除提前引入的租户要求，C300 也按其他用户订单处理；早期多租户描述仅为历史方案，不能作为当前功能声明。见 03d。
+
+最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

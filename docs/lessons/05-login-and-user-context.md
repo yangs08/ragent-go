@@ -28,7 +28,7 @@ GET /user/me 或 POST /auth/logout
   → Handler/Service 从同一 context 取得可信用户
 ```
 
-internal/service/auth.go 直接使用 GORM，用户映射结构只在此服务使用，暂时保持私有。internal/handler/auth.go 负责协议与中间件，internal/config/auth.go 负责统一配置。没有额外的 Repository/Manager/Provider 层。
+internal/service/auth.go 直接使用 GORM，用户映射结构只在此服务使用，暂时保持私有。internal/controller/auth.go 负责协议与中间件，internal/bootstrap/config.go 负责统一配置。没有额外的 Repository/Manager/Provider 层。
 
 ## 密码与账号创建
 
@@ -129,3 +129,7 @@ make auth-smoke
 - [Go bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt)
 - [Go rate limiter](https://pkg.go.dev/golang.org/x/time/rate)
 - [GORM Context](https://gorm.io/docs/context.html)
+
+后续组织调整：普通配置改为 YAML + .env 分层，入口统一 Boot，全局共享启动资源，Result 集中到 common。见 [05a](05a-boot-config-response.md)，旧初始化代码片段按历史阶段理解。
+
+最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

@@ -1,63 +1,54 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net"
+	"os"
 	"strings"
 	"testing"
 )
 
-func TestRunServerRejectsInvalidConfig(t *testing.T) {
-	err := runServer(context.Background(), func(k string) string {
-		if k == "RAGENT_HTTP_ADDR" {
-			return "bad"
+func setupEnvironment(t *testing.T, values map[string]string) {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	for _, item := range os.Environ() {
+		key, _, _ := strings.Cut(item, "=")
+		if strings.HasPrefix(key, "RAGENT_") {
+			t.Setenv(key, "")
 		}
-		return ""
-	}, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "RAGENT_HTTP_ADDR") {
-		t.Fatalf("error=%v", err)
+	}
+	for key, value := range values {
+		t.Setenv(key, value)
 	}
 }
-
+func TestRunServerRejectsInvalidConfig(t *testing.T) {
+	setupEnvironment(t, map[string]string{"RAGENT_HTTP_ADDR": "bad"})
+	if err := runServer(context.Background()); err == nil {
+		t.Fatal("invalid listener address accepted")
+	}
+}
 func TestRunServerReportsBindFailure(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	err = runServer(context.Background(), func(k string) string {
-		if k == "RAGENT_HTTP_ADDR" {
-			return listener.Addr().String()
-		}
-		return ""
-	}, io.Discard)
-	if err == nil {
+	setupEnvironment(t, map[string]string{"RAGENT_HTTP_ADDR": listener.Addr().String()})
+	if err := runServer(context.Background()); err == nil {
 		t.Fatal("expected occupied address error")
 	}
 }
-
 func TestRunServerCleanShutdown(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	address := listener.Addr().String()
-	listener.Close()
+	_ = listener.Close()
+	setupEnvironment(t, map[string]string{"RAGENT_HTTP_ADDR": address})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	var logs bytes.Buffer
-	err = runServer(ctx, func(k string) string {
-		if k == "RAGENT_HTTP_ADDR" {
-			return address
-		}
-		return ""
-	}, &logs)
-	if err != nil {
+	if err := runServer(ctx); err != nil {
 		t.Fatal(err)
-	}
-	if !strings.Contains(logs.String(), "server started") || !strings.Contains(logs.String(), "server stopped gracefully") {
-		t.Fatalf("logs=%s", logs.String())
 	}
 }

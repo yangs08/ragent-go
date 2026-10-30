@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -11,10 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	app "ragent-go/internal"
 	"ragent-go/internal/bootstrap"
-	"ragent-go/internal/config"
-	"ragent-go/internal/database"
-	"ragent-go/internal/handler"
+	"ragent-go/internal/middleware"
 	"ragent-go/internal/service"
 )
 
@@ -28,46 +26,38 @@ func main() {
 func run() error {
 	// Process-level framework setup; constructors do not mutate Gin global mode.
 	gin.SetMode(gin.ReleaseMode)
-	getenv, err := config.Environment(".env", os.LookupEnv)
-	if err != nil {
-		return err
-	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return runServer(ctx, getenv, os.Stdout)
+	return runServer(ctx)
 }
 
-func runServer(ctx context.Context, getenv func(string) string, output io.Writer) error {
-	cfg, err := config.Load(getenv)
+func runServer(ctx context.Context) error {
+	cleanup, err := bootstrap.Boot(ctx)
 	if err != nil {
 		return err
 	}
-	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: cfg.Server.LogLevel}))
-	var auth *service.AuthService
-	if cfg.Database.Enabled {
-		db, err := database.Open(ctx, cfg.Database)
-		if err != nil {
-			return err
-		}
-		pool, err := db.DB()
-		if err != nil {
-			return err
-		}
-		defer pool.Close()
-		logger.Info("database connected")
-		auth, err = service.NewAuthService(ctx, db, cfg.Auth)
+	defer cleanup()
+	if bootstrap.DB != nil {
+		service.Auth, err = service.NewAuthService(ctx)
 		if err != nil {
 			return err
 		}
 	}
-	listener, err := net.Listen("tcp", cfg.Server.HTTPAddr)
+	defer func() { service.Auth = nil }()
+	r := gin.New()
+	r.HandleMethodNotAllowed = true
+	r.RedirectTrailingSlash = false
+	_ = r.SetTrustedProxies(nil)
+	r.Use(middleware.RequestLog(), middleware.Recovery())
+	app.RegisterRoutes(r)
+	listener, err := net.Listen("tcp", bootstrap.Config.Server.HTTPAddr)
 	if err != nil {
 		return err
 	}
-	logger.Info("server started", "address", listener.Addr().String())
-	err = bootstrap.Serve(ctx, listener, handler.NewHandler(logger, auth, cfg.Auth), cfg.Server.ShutdownTimeout)
+	bootstrap.Logger.Info("server started", "address", listener.Addr().String())
+	err = bootstrap.Serve(ctx, listener, r, bootstrap.Config.Server.ShutdownTimeout)
 	if err == nil {
-		logger.Info("server stopped gracefully")
+		bootstrap.Logger.Info("server stopped gracefully")
 	}
 	return err
 }

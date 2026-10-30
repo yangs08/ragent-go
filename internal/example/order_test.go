@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"ragent-go/internal/common"
+	functions "ragent-go/internal/common"
+	"ragent-go/internal/define"
 )
 
 type storeStub struct {
@@ -176,5 +177,5 @@ func TestDemoOrdersRespectsContextAndUser(t *testing.T) {
 }
 
 func aliceContext() context.Context {
-	return common.WithUser(context.Background(), common.User{ID: "alice"})
+	return functions.WithUser(context.Background(), define.User{ID: "alice"})
 }

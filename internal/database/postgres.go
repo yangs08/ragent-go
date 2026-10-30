@@ -3,21 +3,28 @@ package database
 import (
 	"context"
 	"errors"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"math"
 	"net"
 	"net/url"
-	"ragent-go/internal/config"
 	"strconv"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
+	"ragent-go/internal/define"
 )
 
 // Open creates one shared SQL pool, validates connectivity within a deadline,
 // and returns a GORM handle. The process owner must close its underlying sql.DB.
-func Open(ctx context.Context, cfg config.DatabaseConfig) (*gorm.DB, error) {
-	if err := cfg.Validate(); err != nil {
-		return nil, err
+func Open(ctx context.Context, cfg define.DatabaseConfig) (*gorm.DB, error) {
+	if !cfg.Enabled {
+		return nil, errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
+	}
+	ip := net.ParseIP(cfg.Host)
+	local := cfg.Host == "localhost" || (ip != nil && ip.IsLoopback())
+	if cfg.SSLMode != "verify-full" && !(local && cfg.SSLMode == "disable") {
+		return nil, errors.New("database requires verify-full except loopback may disable TLS")
 	}
 	endpoint := url.URL{Scheme: "postgres", Host: net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)), Path: "/" + cfg.Name, User: url.UserPassword(cfg.User, cfg.Password)}
 	q := endpoint.Query()

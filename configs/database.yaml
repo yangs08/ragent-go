@@ -1,0 +1,12 @@
+# Public database configuration. Secrets belong in .env.
+enabled: false
+host: 127.0.0.1
+port: 15432
+name: ragent_go
+user: ragent
+sslmode: disable
+max_open_conns: 10
+max_idle_conns: 5
+connect_timeout: 5s
+conn_max_lifetime: 30m
+conn_max_idle_time: 5m

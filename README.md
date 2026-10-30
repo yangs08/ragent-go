@@ -61,7 +61,7 @@ make smoke
 
 ## 真实模型联调
 
-在项目根目录 `.env` 填写 `RAGENT_MODEL_BASE_URL`、`RAGENT_MODEL_NAME`、`RAGENT_MODEL_API_KEY` 后运行 `make modelcheck`。可选 `RAGENT_MODEL_TIMEOUT`（默认 20s）和 `RAGENT_MODEL_PROMPT`。Base URL 使用供应商指定的兼容接口根路径，例如以 `/v1` 结尾的地址；不要填完整 `/chat/completions`。
+在项目根目录 `.env` 填写 `RAGENT_MODEL_BASE_URL`、`RAGENT_MODEL_NAME`、`RAGENT_MODEL_API_KEY` 后运行 `make modelcheck`。可选 `RAGENT_MODEL_TIMEOUT`（默认 20s），问题通过命令 `-prompt` 参数传入。Base URL 使用供应商指定的兼容接口根路径，例如以 `/v1` 结尾的地址；不要填完整 `/chat/completions`。
 
 真实凭据只保存在被 Git 忽略的本机 `.env` 或安全运行环境中，不写入示例、文档或命令历史。该命令会实际调用配置的服务，可能产生用量费用。开发阶段已验证一次真实文本调用；自动化测试和冒烟只使用本地模拟服务。
 
@@ -89,7 +89,7 @@ make agentcheck
 
 开发用户由 CLI 注入为 alice：A100=shipped，A101=delivered；B200 和 C300 属于其他用户，对当前身份均返回 not_found。没有真实写操作、真实业务订单或生产登录认证。
 
-可选配置：RAGENT_AGENT_PROMPT、RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
+可选配置：RAGENT_AGENT_MAX_ITERATIONS（默认 4）、RAGENT_AGENT_MAX_TOOL_CALLS（默认 3）、RAGENT_AGENT_TIMEOUT（默认 30s）。未设置时使用默认值，无需改动现有 .env。单次模型请求仍受 RAGENT_MODEL_TIMEOUT 约束。
 
 执行器支持工具调用与无工具的澄清回答；订单提示词要求具体状态依据查询结果，程序目前不保证自然语言与结果完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
 
@@ -130,3 +130,13 @@ make dbcheck
 数据库开启并执行 make migrate 后，可用 make user-create USERNAME=alice 创建账号，终端输入密码不回显。make run 提供 POST /auth/login、POST /auth/logout、GET /user/me；Authorization 直接传登录返回的 token。登录结果沿用 HTTP 200 + 业务 code，检查 code 是否为字符串 "0"。
 
 可执行 make auth-smoke 验证本项目专属容器中的真实认证链路，会自动清理随机测试账号。角色与用户管理后台尚未实现，细节见 [第五课](docs/lessons/05-login-and-user-context.md)。
+
+## 配置与启动约定
+
+普通配置维护在 configs/*.yaml；.env 保存密钥与本机覆盖。优先级：系统环境变量 > .env > YAML > 程序默认值。已有 .env 未自动迁移，同名配置仍会覆盖 YAML。
+
+bootstrap.Boot 统一初始化 bootstrap.Config、bootstrap.DB、bootstrap.Logger，业务响应复用 define.Result。详见 [配置说明](configs/README.md) 与 [整改课文](docs/lessons/05a-boot-config-response.md)。修改完成后等待用户确认，不自动 commit。
+
+当前配置已改为 define/config.go 的结构体标签自动映射，公共启动变量直接放 bootstrap/boot.go；已移除 global 目录。详见 05a 整改课文。
+
+当前入口使用 bootstrap.Boot(ctx)，日志统一 stderr。model 存放数据库实体，AI 客户端位于 service/model.go，共享函数位于 internal/common/functions.go。Diagnostics 与配置 Validate 已移除，联调问题使用 -prompt 参数。
