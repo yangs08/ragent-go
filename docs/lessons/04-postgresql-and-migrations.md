@@ -1,5 +1,6 @@
 # 第 04 课：PostgreSQL、GORM 与数据库迁移
 
+> 本文保留该课的实现与验证记录；当前目录与装配见 [架构说明](../ARCHITECTURE.md)，后续学习以 [专题路线](../ROADMAP.md) 为准。
 日期：2026-10-29。状态：本机独立 PostgreSQL 验证完成，尚未实现登录与会话业务。
 
 ## 目标与技术选择
@@ -100,7 +101,3 @@ status 依赖 Goose 的版本表，初次状态访问可能初始化版本元数
 
 - [GORM 数据库与连接池](https://gorm.io/docs/connecting_to_the_database.html)
 - [Goose Provider、迁移与 session lock](https://pressly.github.io/goose/documentation/provider/)
-
-后续组织调整：普通配置改为 YAML + .env 分层，入口统一 Boot，全局共享启动资源，Result 集中到 common。见 [05a](05a-boot-config-response.md)，旧初始化代码片段按历史阶段理解。
-
-最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。

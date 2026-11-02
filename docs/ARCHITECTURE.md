@@ -1,6 +1,6 @@
 # 当前架构与设计边界
 
-本文件描述当前实现。历史过程见 lessons；不以历史示例作为当前目录规范。
+本文件描述当前实现，是目录、装配和资源边界的统一说明。lessons 保留核心课程的学习与验证记录，其中旧代码片段不作为当前目录规范。
 
 ## 目录与职责
 
@@ -16,7 +16,7 @@
 - internal/example：明确标记为学习示例的订单工具和本地数据。
 - internal/common：统一 HTTP 响应、共享函数和安全诊断。
 - internal/define：配置、接口结构、Result、BusinessError。
-- internal/common/functions.go：用户 context、token 等共享小函数。
+- internal/common/functions.go：用户 context、token 和 FailureAttrs 等共享函数。
 - internal/database：PostgreSQL 连接初始化。
 - internal/bootstrap：配置装载、Boot、全局 DB/Config/Logger、HTTP 生命周期与优雅关闭。
 - migrations：独立 SQL 迁移，不在 HTTP 启动时自动改表。
@@ -47,8 +47,24 @@ HTTP 聊天、会话历史、停止接口和 SSE 尚未实现。第一版规划�
 
 响应统一 Success / Fail / NoAuth / Error；业务错误构造位于 define/error.go，内部原因保留但不直接打印。失败日志只使用允许的诊断字段，恢复逻辑在 middleware/recovery.go。Session 实体对应 auth_sessions，过期时间采用数据库时钟。
 
-HTTP 认证使用启动时发布的 service.Auth，Router 仅接收 Gin 引擎；Controller 和中间件直接使用共享服务。实例运行期间只读，请求结束后清空，随后释放基础资源。
+HTTP 认证使用启动时发布的 service.Auth，Router 仅接收 Gin 引擎；Controller 和中间件直接使用共享服务。实例运行期间只读，服务停止且请求处理结束后清空，随后释放基础资源；不是每个请求结束后清空。
 
 账号创建由 UserService.Create 提供；AuthService 负责登录认证。公共日志中间件不透传 Logger，初始化时读取启动资源。统一响应禁止向已提交的响应追加 JSON。
 
 部署配置直接映射到 SDK、数据库驱动及执行器，业务代码不重复进行字段预检；配置文件类型解析、真实调用失败、外部输入与授权检查继续保留。模型 URL 由部署者决定，数据库 TLS 策略保留。
+
+## Agent 执行与输出的边界
+
+cmd/agentcheck 直接装配模型、示例工具和服务端 Definition；internal/agent 不编码 CLI JSONL 或 HTTP SSE。EventSink 同步接收类型化事件，返回错误即结束本轮；Run 返回后不再调用回调。同步回调必须及时返回，context 不能强制终止阻塞的回调，后续 SSE 适配需要写出期限。
+
+当前每轮创建 ADK 运行对象、工具预算和调用关联状态；注册的工具可复用，调用时从 context 读取当前用户。Java 参考项目的 UserContext 职责在 Go 中用 context 传递，不用全局用户变量或模拟线程局部状态。Tool Schema 不接受 user_id，数据归属在工具执行时验证。
+
+当前 Runner 使用 EnableStreaming=false，只产生完整步骤消息；内部 tool_call/tool_result/answer 不等同于 HTTP SSE 帧，也不是持久事件总线。展示工具结果须由 Definition 显式开启，原始模型参数不直接输出。允许无工具澄清；答案是否忠实于工具结果仍需独立评估。
+
+模型请求期限、整轮期限、决策轮数和工具调用次数分别约束不同边界。预算属于每轮状态，不存进共享工具或当前用户配置。第一版尚未接入历史和 ADK 中间件，后续学习顺序见 [学习路线](ROADMAP.md)。
+
+## 配置与阅读入口
+
+配置映射和密钥来源见 [配置说明](../configs/README.md)。联调问题通过 modelcheck / agentcheck 的 -prompt 参数输入；不读取 RAGENT_MODEL_PROMPT 或 RAGENT_AGENT_PROMPT。必要的复杂逻辑注释解释设计原因、状态边界与失败处理，普通赋值和 CRUD 不逐行复述。
+
+当前优先学习 Agent / Eino 的机制，通过参考 Ragent 和项目实验检验理解。通用后台开发按需补充；不以代码已实现或测试通过代替学员能解释、修改和复现。

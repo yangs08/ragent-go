@@ -1,5 +1,6 @@
 # 第 02 课：基于 Eino ADK 的工具型 Agent
 
+> 本文保留该课的实现与验证记录；当前目录与装配见 [架构说明](../ARCHITECTURE.md)，后续学习以 [专题路线](../ROADMAP.md) 为准。
 - 创建：2026-10-28。
 - 状态：本地实现与验收完成；真实供应商工具能力、学员操作与复盘待完成。
 - 本课最终实现提交：`5893209`；TDD 检查点详见文末。
@@ -7,7 +8,7 @@
 - 关联：M0 的 ADK 兼容原型；C13 工具型 Agent 的起点，不代表完整 Agent 平台已交付。
 - 实施位置：`/Users/admin/workspace/ragent-go`。
 
-架构更新：第三课已将本课代码按职责重整；当前阅读路径与行为以下文及 [综合整改实践](03c-architecture-refactor.md) 为准，早期提交记录保留作为历史。
+架构更新：第三课已将本课代码按职责重整；当前阅读路径与行为以下文及 [当前架构](../ARCHITECTURE.md) 为准，早期提交记录保留作为历史。
 
 路径说明：命令中的 `/path/to/ragent-go` 请替换为自己的项目目录；本机环境记录保留历史实际路径。课程正式文档位于项目 `docs/lessons/`。
 
@@ -116,12 +117,12 @@ Go 版同样复用框架循环：用 Eino ADK 替代 AgentScope，应用维护�
 ```text
 cmd/agentcheck/main.go         配置、模型、工具装配和 CLI 输出
 internal/agent/agent.go        Agent 定义、通用运行、事件与预算
-internal/common/user.go  当前请求用户的 context 存取
+internal/common/functions.go  当前请求用户的 context 存取
 internal/example/order.go     示例订单工具与本地数据
 internal/bootstrap/config.go      集中管理的执行配置
 ```
 
-顺序阅读入口装配 → Agent 执行 → 示例工具 → 用户上下文。详见 [当前收敛实践](03d-agent-user-context.md)。
+顺序阅读入口装配 → Agent 执行 → 示例工具 → 用户上下文。详见 [当前架构](../ARCHITECTURE.md)。
 
 ### 为什么身份不放在 Tool Schema 中
 
@@ -191,11 +192,11 @@ make agentcheck
 
 未校验的原始模型参数不会直接输出，避免未知字段中的敏感内容被打印。若模型发出多次调用，会出现多组调用/结果事件。
 
-可通过 .env 的 RAGENT_AGENT_PROMPT 修改问题，或在本次命令临时覆盖：
+通过命令参数修改本次问题：
 
 ```sh
-RAGENT_AGENT_PROMPT="查询 A101 的订单状态，请调用工具" make agentcheck
-RAGENT_AGENT_PROMPT="查询 B200 的订单状态，请调用工具" make agentcheck
+go run ./cmd/agentcheck -prompt "查询 A101 的订单状态，请调用工具"
+go run ./cmd/agentcheck -prompt "查询 B200 的订单状态，请调用工具"
 ```
 
 第一条预期工具结果 delivered；第二条预期 not_found，而不是返回 bob 的订单。不要仅看最后一句自然语言，要检查 tool_result。
@@ -262,6 +263,4 @@ make smoke 会在临时目录创建自己的 .env、本地模型协议服务与�
 
 接口依据：已锁定版本中的 [ADK ChatModelAgent](https://github.com/cloudwego/eino/blob/v0.9.22/adk/chatmodel.go)、[Runner](https://github.com/cloudwego/eino/blob/v0.9.22/adk/runner.go)、[工具辅助组件](https://github.com/cloudwego/eino/blob/v0.9.22/components/tool/utils/invokable_func.go)。本课具体保证以应用代码和测试为准，框架存在机制不等于应用已自动获得完整业务保障。
 
-当前设计已移除提前引入的租户要求，C300 也按其他用户订单处理；早期多租户描述仅为历史方案，不能作为当前功能声明。见 03d。
-
-最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。
+当前设计已移除提前引入的租户要求，C300 也按其他用户订单处理；早期多租户描述仅为历史方案，不能作为当前功能声明。见 [当前架构](../ARCHITECTURE.md)。

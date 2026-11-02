@@ -18,8 +18,11 @@
 
 - bootstrap 不导入 common 或业务包；cmd/server 装配业务对象和 Gin，internal.RegisterRoutes 只注册路由。子包不得反向导入 internal 根包。
 
-- HTTP AuthService 通过 service.Auth 共享；cmd/server 在注册路由前初始化，请求结束后清空；禁止存请求状态。RegisterRoutes 只接收 Gin 引擎。
+- HTTP AuthService 通过 service.Auth 共享；cmd/server 在注册路由前初始化，服务停止且请求处理结束后清空；禁止存请求状态。RegisterRoutes 只接收 Gin 引擎。
 
 - 简单路由注册不单独编写测试；验证聚焦业务规则、认证隔离和关键失败路径，优先复用集成验证。
 
 - 信任部署配置，不在业务代码重复检查模型名、API Key、超时和 token 数量；保留解析错误、真实调用错误及外部输入与权限校验。模型 URL 与协议由部署配置负责，不额外限制；数据库 TLS 策略保留。
+
+- 教学以 Agent / Eino 机制为主线，Ragent 源码与 Go 项目用于实验验证；普通 CRUD 和封装整改按需补充，不以实现完成推断学员掌握。
+- 复杂逻辑用中文注释说明设计原因、状态与失败边界；不为直白赋值和普通 CRUD 逐行添加注释。

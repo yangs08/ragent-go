@@ -30,6 +30,8 @@ func loadConfigDir(dir string, lookup func(string) (string, bool)) (define.Confi
 	if err := env.ParseWithOptions(&cfg, env.Options{Environment: map[string]string{}}); err != nil {
 		return cfg, errors.New("invalid configuration defaults")
 	}
+	// Config 顶层字段的 yaml 标签同时约定文件名，如 auth 对应 auth.yaml。
+	// 这里只遍历和装载配置，字段解析交给 YAML/env 库，不维护第二套字段映射表。
 	root := reflect.ValueOf(&cfg).Elem()
 	typ := root.Type()
 	for i := 0; i < root.NumField(); i++ {
@@ -65,6 +67,8 @@ func collectOverrides(value reflect.Value, lookup func(string) (string, bool), v
 			if !present {
 				continue
 			}
+			// 显式空环境变量也覆盖 YAML：先清零，再使用 envDefault（若有）。
+			// 未设置的环境变量则保留 YAML 值；两种情况通过 lookup 的 present 区分。
 			if text == "" {
 				target.SetZero()
 				text = field.Tag.Get("envDefault")
@@ -106,6 +110,7 @@ func readYAML(path string, target any) error {
 	if err := decoder.Decode(target); err != nil && err != io.EOF {
 		return fmt.Errorf("invalid YAML configuration in %s: check field names and types; secrets belong in .env", filepath.Base(path))
 	}
+	// 第一次 Decode 只读取一份文档；再次读取必须到 EOF，防止后续 YAML 文档被静默忽略。
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return fmt.Errorf("configuration must contain a single YAML document: %s", filepath.Base(path))
 	}

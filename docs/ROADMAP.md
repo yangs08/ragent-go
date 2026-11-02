@@ -1,84 +1,96 @@
-# Ragent Go：40 节主课路线
+# Agent 与 Eino 学习路线：以 Ragent 为参考实现 Go 企业项目
 
-更新：2026-10-29。目标是建设与 Ragent 核心能力对应的完整企业级 Agentic RAG 平台，并能解释设计、修改实现、通过失败实验验证边界。
+更新：2026-11-02。课程目标按用户本次明确的优先级修订：理解 Agent，掌握 Eino，通过参考 Ragent 的真实机制逐步形成 Go 企业项目。
 
-## 课时估计
+## 1. 学习主线与项目载体
 
-先按 **40 节主课**规划。复杂模块可能拆课，预计实际约 **40–50 节**；这不是固定视频时长，也不承诺每节工作量相同。每课包含业务目标、源码导读、设计、实现、测试和学员复盘。
+Agent / Eino 的机制与设计判断决定学习顺序；Go 项目用于承接实验和验证企业约束。原来的 40 节计划以功能交付顺序为主，导致数据库、认证、CRUD 和封装整改挤占核心学习，本次替换为专题路线，不预先固定课数。旧的开发顺序计划已清理，后续以本路线为准。
 
-尤其是审批恢复、上下文/长期记忆、复杂文档、管理后台和部署验收，可能需要分多个小节。不能为了保持课数而省略验收。
+完整企业项目仍是长期实践目标；用户端、后台、入库、检索、权限和部署范围保留在 PROJECT.md，但不逐项变成核心课程，也不把已有代码等同于学员已掌握。每个专题可根据理解情况拆成多次学习。
 
-第 1、2 课代码与本地测试已完成，不等于全部学习/真实联调已完成。第 3 课接口契约已固化，运行接口尚未实现；第 4 课数据库底座已本机验证，第 5 课登录认证已验证，第 6–40 课为计划。课表可随实测约束调整，范围变更需回写 PROJECT.md。
+- 概念：这个机制解决什么问题，输入、输出、状态和失败边界分别是什么？
+- 参考：Ragent 如何实现，哪些属于 AgentScope，哪些属于应用业务？
+- 框架：Eino 提供什么，对照项目锁定版本源码理解实际契约。
+- 实验：先预测轨迹，修改一个变量，观察执行证据，再解释差异。
+- 沉淀：把理解后的能力接入现有 Go 项目，补充必要工程保障。
 
-## 阶段划分
+普通 Go/Gin/GORM 知识按需讲解，不反复作为主课。CLI、内存历史和固定文档可用于机制实验；真实身份隔离、事务、取消、审批绑定等约束随能力落地验证，不拖到最后。
 
-| 阶段 | 课程 | 数量 | 阶段成果 |
+## 2. 已有基础与学习证据
+
+截至本次静态检查，项目工作区基于 4ee84e3，并保留本轮尚未提交的注释和公共函数整理。没有重新运行服务、测试或付费模型。
+
+| 现有内容 | 可复用基础 | 尚需学习/验证 |
+|---|---|---|
+| 模型与订单 Agent | ChatModelAgent、Runner、InferTool、预算、取消、事件回调 | 能否独立解释完整消息序列、工具结果关联、停止条件；真实工具联调记录仍待补 |
+| HTTP、数据库、认证 | 配置、日志、迁移、可信用户 context | 作为后续实验基础复用，不重讲整套后台开发 |
+| API / SSE 契约 | 已定义路径与事件形状 | 当前无聊天 HTTP / SSE，不把契约当实现 |
+| 历史课程 01–05 与补充 | 保存实现过程与当时验证证据 | 部分目录、状态为历史记录，当前架构以 ARCHITECTURE.md 和代码为准 |
+
+当前 internal/agent/agent.go 使用 EnableStreaming=false 和 runner.Query(ctx, question)，没有向 Runner 传入历史消息，也没有配置 ADK Handlers。因此下一步先深入已有执行器，而不是立即补会话 CRUD。
+
+## 3. 核心专题
+
+A 编号表示新学习专题，与历史课程 01–05 不互相覆盖。顺序按概念依赖安排，可以回访，不表示每个专题只上一课。全部专题尚未验收学员掌握程度。
+
+| 专题 | 要理解的问题与 Eino 重点 | Ragent 阅读锚点 | 关键实验与项目沉淀 |
 |---|---|---|---|
-| 基础与 Agent 服务化 | 01–07 | 7 | 工程、工具循环、可信身份、持久运行与流式协议 |
-| 知识与入库闭环 | 08–15 | 8 | 授权知识库、文档/索引生命周期与首个 RAG |
-| 检索质量与评估 | 16–22 | 7 | 混合检索、问题理解、多轮问答与质量反馈 |
-| Agent 核心进阶 | 23–30 | 8 | Agentic RAG、MCP、审批/写操作、Skills 与记忆 |
-| 企业治理与扩展 | 31–35 | 5 | 模型容错、分布式控制、观测与增强数据源 |
-| 完整用户端与后台 | 36–38 | 3 | 可操作、可配置、可排障的完整控制台 |
-| 部署与最终验收 | 39–40 | 2 | 可复现部署、恢复/故障演练与容量质量证据 |
+| A01 Agent 执行循环 | LLM 调用、Tool Calling、Agent 有何区别；ChatModelAgent、Runner.Query/Run、Message、停止条件 | ReActAgentProvider、AgentToolCatalog | 手绘并核对 user → assistant(tool_calls) → tool → assistant；比较无工具、单次、多次调用及预算耗尽 |
+| A02 工具与中间件 | Schema、InferTool、参数校验、业务结果与 error；Handlers 的模型/工具扩展点、执行顺序 | AgentToolCatalog、AgentToolBatchMiddleware | 修改工具描述/返回结果，观察选择与纠错；在合适的工具边界验证权限和预算，说明与 Gin 中间件的区别 |
+| A03 事件流与可观测性 | AgentEvent、AsyncIterator、完整消息与增量流、callbacks 与事件消费的职责 | AgentStreamEventBridge、AgentSSEEventType | 先在 CLI 观察实际事件和时序，再适配已有 SSE 契约；验证中途失败和取消，不伪造 reasoning |
+| A04 多轮上下文与记忆 | UI 消息、模型上下文、运行状态、检查点、长期记忆的区别；Runner.Run、Reduction、Summarization | PgAgentStateStore、AgentContextTrimmer、AgentContextCompactionMiddleware、AgentUserMemoryMiddleware | “查 A100”后追问“它现在什么状态”；比较无历史/完整历史/摘要；保护 tool call/result 配对，再持久化必要状态 |
+| A05 Eino 组件与固定 RAG | ChatTemplate、Loader/Transformer、Embedding、Indexer、Retriever；Chain/Graph/Workflow 的选择依据 | StreamChatPipeline、IngestionEngine | 用少量固定文档打通检索→证据→生成；先分离检索失败与生成失败，再接真实索引和必要入库流程 |
+| A06 Agentic RAG | Agent 何时决定检索、再次检索或结合业务工具；固定 RAG 与 Agent 的责任边界 | KnowledgeSearchTool、KnowledgeSearchFacade、MultiChannelRetrievalEngine | 同题比较固定流程与 Agent；订单+政策联合问答；按失败样例引入混合召回/RRF/Rerank，而非先堆组件 |
+| A07 MCP 与工具治理 | 本地 Go Tool 与 MCP 的差别；发现、Schema、调用、连接和授权 | McpToolProxy、AgentToolCatalog | 用本地 MCP 演示服务替换一个工具；模拟超时、断开及工具目录变化；扩展模块版本单独验证 |
+| A08 人工确认与恢复 | interrupt/resume、CheckPointStore；模型意图、用户批准与业务执行之间的关系 | agent/confirm、AgentConfirmDenialMiddleware、AgentChatServiceImpl | 独立测试数据中的申请操作：批准/拒绝/恢复、参数绑定与重复提交；先理解执行恢复，再接审批 API |
+| A09 Skills 与上下文治理 | Skill 与 Prompt/Tool/MCP 的区别；按需加载、工具开放、摘要与长期事实 | SkillLoadTool、AgentSkillMaskingMiddleware、AgentMemoryLearner | 比较始终注入与按需加载；验证技能加载不等于授权、摘要后行为是否仍成立；记忆来源与撤销 |
+| A10 质量与企业运行约束 | 正确性、调用轨迹、成本/延迟、重试与幂等、观测、并发取消；机制取舍 | AgentRunGate、ModelRoutingExecutor、resources/regression | 用前面累积的固定样例比较策略；注入模型/工具失败；验证隔离和取消，将有效能力整合进服务 |
 
-权限、错误、日志和测试在每课落实；第 31–40 课补齐跨系统治理与完整验收，不把这些要求全部拖到最后。前端在接口稳定后逐步接入，36–38 课完成全量交互与后台验收。
+A10 是集中复盘和补齐，不是第一次做评估。A01 起保留小型任务集、预期工具行为和失败样例；有真实调用授权与配置时才补真实供应商证据。
 
-## 课程清单
+多 Agent、AgentAsTool、Sequential/Parallel/Loop、Plan-Execute、DeepAgents 作为后续进阶专题：先用同一任务与单 Agent 比较质量、上下文和成本，再决定是否融入项目。Ragent 未覆盖的机制，明确标注为 Eino 扩展学习，不虚构 Java 对应实现。
 
-能力编号 C01–C23 对应 [项目能力地图](PROJECT.md)。它们是覆盖关系，不表示某课一次完成对应能力的全部生产要求。
+## 4. 下一次学习：A01，拆解现有 Agent 的一次执行
 
-| 课次 | 主题 | 本课交付/学习重点 | 能力 | 状态 |
-|---|---|---|---|---|
-| 01 | [项目初始化与 Eino 兼容性](lessons/01-project-bootstrap.md) | Gin、.env、健康检查、退出和模型联调 | C02 C20 C21 C23 | 本地验收完成，待学员复盘 |
-| 02 | [工具型 Agent 入门](lessons/02-agent-and-tools.md) | 只读订单工具、ADK 循环、调用结果关联、执行预算 | C13 | 本地验收完成，真实工具联调待验证 |
-| 03 | [API 与运行契约设计](lessons/03-api-and-run-contract.md) | 对照 Ragent 聊天/会话接口、SSE 协议、OpenAPI、取消与重复提交边界 | C13 C19 C23 | OpenAPI / SSE 示例完成，运行接口待后续课程 |
-| 04 | [PostgreSQL 工程集成](lessons/04-postgresql-and-migrations.md) | GORM 连接池、独立迁移、真实数据库事务验证 | C23 | 本机验证完成，待学员复盘 |
-| 05 | [登录认证与用户上下文](lessons/05-login-and-user-context.md) | bcrypt、数据库会话、登录/登出/当前用户、请求上下文；租户/角色后续引入 | C01 | 真实 HTTP/PG 验证通过 |
-| 06 | 会话、运行与事件持久化 | 消息与执行分离、状态机、唯一约束、事件序号与版本快照 | C16 C19 | 计划 |
-| 07 | Agent HTTP 与 SSE | 请求内 SSE、断线取消、主动停止、部分结果与慢客户端边界 | C13 C19 | 计划 |
-| 08 | 知识库与知识权限 | 知识库管理、ACL、路由与授权求交、原文访问规则 | C01 | 计划 |
-| 09 | 文件上传与对象存储 | S3 适配、限额与类型验证、文件引用、暂存与孤儿清理 | C03 | 计划 |
-| 10 | 解析、清洗与分块 | Markdown/TXT、分块策略、重叠与元数据、可复现处理 | C03 C04 | 计划 |
-| 11 | Embedding 与向量索引 | 模型/维度匹配、批量写入、pgvector 检索与作用域 | C04 | 计划 |
-| 12 | 可靠异步入库 | PG 任务/Outbox、Worker、租约、幂等、重试与取消 | C05 C23 | 计划 |
-| 13 | 可配置入库 Pipeline | 节点注册、流水线校验/版本、执行日志、失败定位 | C05 | 计划 |
-| 14 | 文档版本与索引一致性 | active_version 发布、增量更新、删除、对账与修复 | C06 | 计划 |
-| 15 | 首个完整 RAG 问答 | 检索、证据、Prompt、流式生成、稳定引用与无答案处理 | C12 | 计划 |
-| 16 | 中文关键词检索 | 关键词后端、中文分析、精确编号、权限与版本过滤 | C09 | 计划 |
-| 17 | 多通道并行与 RRF | 向量/关键词并行、超时隔离、去重、排名融合 | C09 C10 | 计划 |
-| 18 | Rerank 与检索预算 | 候选漏斗、重排序适配、证据门槛、耗时/效果实验 | C10 | 计划 |
-| 19 | 问题理解与改写 | 指代消解、查询词映射、拆分、查询扇出和失败回退 | C07 | 计划 |
-| 20 | 意图树与多知识库路由 | 意图配置、歧义追问、路由解释、越权回归 | C08 | 计划 |
-| 21 | 多轮 RAG 与会话摘要 | 历史加载、摘要策略、预算、引用与上下文完整性 | C16 | 计划 |
-| 22 | 质量评估与反馈闭环 | 标注集、Recall/MRR、答案/引用检查、用户反馈与推荐追问 | C12 C23 | 计划 |
-| 23 | Agentic RAG | 将共享授权检索封装为工具，结合订单与知识完成任务 | C13 | 计划 |
-| 24 | MCP 客户端与工具治理 | 发现/Schema、命名空间、服务器信任、认证、超时与重连 | C14 | 计划 |
-| 25 | 独立 MCP 业务服务 | 用官方 SDK 暴露示例工具，资源授权与协议测试 | C14 | 计划 |
-| 26 | 人工确认与检查点 | 中断、持久 Checkpoint、审批绑定、过期/拒绝与进程恢复 | C18 | 计划 |
-| 27 | 业务写操作与幂等 | 稳定 operation_id、重复确认、结果未知、对账与补偿 | C18 | 计划 |
-| 28 | Skills 与工具开放规则 | 技能注册、渐进加载、发布版本、工具可见性与执行校验 | C15 | 计划 |
-| 29 | Agent 上下文治理 | 工具结果裁剪、摘要、调用结果配对、压缩失败与回放 | C16 | 计划 |
-| 30 | 跨会话长期记忆 | 事实提取、来源与范围、更正/撤销/删除、隔离与评估 | C17 | 计划 |
-| 31 | 模型治理与容错 | 逻辑档位、路由、能力校验、首包、重试/熔断/降级与预算 | C02 C20 | 计划 |
-| 32 | 分布式并发与公平排队 | Redis 队列/租约、用户配额、跨实例取消、丢锁与清理 | C19 | 计划 |
-| 33 | 全链路观测与审计 | Eino callbacks/OTel、Langfuse、Token/成本、变更审计与指标 | C21 | 计划 |
-| 34 | 复杂文档与远程刷新 | PDF/Office/网页、OCR/VLM 选型、来源连接器、定时刷新 | C03 C06 | 计划 |
-| 35 | 图谱与联网召回扩展 | 图谱服务、联网搜索、来源归属、隔离、同步/删除修复 | C11 | 计划 |
-| 36 | 用户端完整交互 | 聊天、工具时间线、审批、取消、来源预览、反馈与恢复 | C22 C12 | 计划 |
-| 37 | 知识与任务管理后台 | 用户/权限、知识库、文档/Chunk、入库与刷新任务 | C22 | 计划 |
-| 38 | AI 配置与运维后台 | 模型、人设、Prompt、意图、Skills、Trace 和运行看板 | C22 C21 | 计划 |
-| 39 | 部署、CI 与恢复演练 | Compose profiles、配置/密钥、CI、安全检查、备份与恢复 | C23 | 计划 |
-| 40 | 生产验收与项目答辩 | 质量回归、压测、容量/成本、故障演练、能力核对与设计复盘 | C23 | 计划 |
+不是重做第二课代码，而是补齐原课尚未证明的理解。
 
-## 后续课程文件规则
+阅读范围只取三处：
 
-开课时才创建该课实际 Markdown，不提前生成空白课程或伪造已完成状态。第 3 课起沿用两位编号与独立主题文件名。实现提交、数据集、实际命令、失败/修复与复验结果写入对应课程。
+1. cmd/agentcheck/main.go：模型、工具、Definition 和用户 context 在哪里装配？
+2. internal/agent/agent.go：Runner 在哪里启动？何时调用工具、发事件、停止或报错？
+3. internal/example/order.go：Schema 如何产生？模型参数如何到达 Go 函数？身份校验在哪里？
 
-当前的里程碑 M0–M7 是交付阶段，课程是学习顺序，两者不是一一对应。为尽早理解 Agent，第二课先做可控 CLI 原型，再补身份、持久运行与服务化；不会把 CLI 原型当作已经完整上线的服务。
+再定向对照 Ragent 的 ReActAgentProvider 和 AgentToolCatalog，以及 Eino v0.9.22 的 adk/chatmodel.go、adk/runner.go、compose/tools_node.go；不要求通读整个仓库。
 
-## 下一步
+先预测，再观察以下实验（计划，尚未执行）：
 
-第 3 课契约与架构收敛完成后，第 4 课 PostgreSQL + GORM 底座已完成，第 5 课登录认证已完成，下一课进入会话与消息持久化。第二课真实供应商工具联调仍待学员操作，不将本地协议测试等同真实联调。后续每课代码与文档共同版本管理。
+- “查询 A100”：工具结果如何成为下一次模型调用的输入？
+- “查询 A100 和 A101”：一个决策轮次能否提出多个调用？以实际轨迹为准，观察结果而不强求模型固定行为。
+- 缺少订单编号：为什么可以直接澄清，而非强制调用工具？
+- 参数无效、工具不可用、预算耗尽：哪些反馈回模型，哪些终止执行？
+- 区分用户轮次、模型决策轮次、工具调用次数，解释三个预算各限制什么。
 
-第一版范围决定（2026-10-29）：交互 Agent 按请求绑定 SSE，断线取消；后台 Run、独立订阅、幂等找回和事件补发后续扩展，不作为第 7 课交付前置条件。持久知识入库 Worker 仍按原计划建设。
+允许在小型实验中手写一个最小 Tool Calling 循环，与 ADK 对照职责；正式项目继续复用 ADK，不长期维护第二套执行器。观察的是可见消息与调用轨迹，不要求模型披露内部思维链。
+
+学完的证据：能画出真实消息序列，指出“模型决定调用”和“程序执行工具”的代码位置，解释 call ID 配对及停止条件，并在不照抄答案的情况下修改一个边界。完成后再进入 A02；没有掌握就沿该问题继续，而不按文件数量或固定课数推进。
+
+## 5. 教学方式
+
+每次只聚焦一至两个核心问题。先提问和预测，再讲概念和读关键源码；给出必要的最小示例，由学员解释、修改或复现实验，最后把有价值的结果接回项目。
+
+课程记录分开写“实现已有”“实验已执行”“学员能解释/修改”；后两者没有证据时保持待验证。工程补充只覆盖本专题需要的范围，不连续用课程讨论封装、目录命名或普通 CRUD。
+
+企业目标体现在可验证的边界：工具授权不靠 Prompt、写操作有确认与幂等、状态可追溯、失败可定位、取消和资源退出有证据。平台页面与通用基础设施可以集中补齐，但这些直接影响 Agent 正确性的机制必须随专题学习。
+
+## 6. 资料与版本依据
+
+2026-11-02 查阅：
+
+- [Eino ADK Quickstart](https://www.cloudwego.io/docs/eino/core_modules/eino_adk/agent_quickstart/)：核心入口和学习导航。
+- [ChatModelAgent 入门](https://www.cloudwego.io/docs/eino/overview/eino_adk_quickstart/)：决策、工具反馈、上下文与运行时增强的关系。
+- [Middleware](https://www.cloudwego.io/docs/eino/core_modules/eino_adk/eino_adk_chatmodelagentmiddleware/)：生命周期扩展与执行顺序。
+- [Eino 编排](https://www.cloudwego.io/docs/eino/core_modules/chain_and_graph_orchestration/)：组件与编排层职责。
+- [Eino Cookbook](https://www.cloudwego.io/docs/eino/cookbook/)：按专题挑选官方示例，不逐个照搬。
+- [Building effective agents](https://www.anthropic.com/research/building-effective-agents)：2024 年文章，借鉴其固定 Workflow 与模型自主决策的区分及简单可组合的设计思路；不作为当前 SDK API 依据。
+
+以上是课程设计参考，不是兼容性验证。本项目保持 Eino v0.9.22；本次核对本地该版本的 Runner.Query/Run、EnableStreaming、Handlers 及相关包存在性。具体接口以该 tag 源码和编译实验为准，不因官网新示例自动升级；MCP 等独立扩展需分别记录版本。当前未执行新的编译、真实模型调用或实验。

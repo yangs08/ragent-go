@@ -1,54 +1,35 @@
-# Ragent Go 学习目录
+# Ragent Go 学习入口
 
-目标：基于 Go + Eino，参考 Ragent 逐步建设完整的企业级 Agentic RAG 平台。
+首要目标是学习 Agent 和 Eino，参考 Ragent 源码，通过 Go 企业项目验证理解。正式文档只维护在项目 docs/；Obsidian 目录保留访问入口。
 
-## 文档位置与版本管理
+## 从这里开始
 
-本目录 `docs/` 是课程文档的正式维护位置，实际 Markdown 随项目 Git 提交，克隆后可直接阅读。原本机学习入口 `/Users/admin/workspace/docs/studyroom/ragent-go` 链接到本目录，保留原访问路径；不要再维护两份内容。这个本机快捷链接不在项目 Git 中，也不是其他机器的依赖。
+- [学习路线](ROADMAP.md)：核心专题、学习方法和下一次 A01「拆解现有 Agent 的一次执行」。
+- [当前架构](ARCHITECTURE.md)：真实目录、装配、身份、事务和执行边界。
+- [项目设计与能力地图](PROJECT.md)：长期项目范围；交付阶段不等于课程顺序。
+- [接口与 SSE 契约](api/README.md)：区分已实现接口与计划接口。
+- [配置说明](../configs/README.md)：YAML、环境覆盖、密钥和 Boot。
 
-## 文档入口
+## 已有课程记录
 
-- [40 节主课路线](ROADMAP.md)：按 40 节规划，复杂内容可拆至约 40–50 节。
-- [项目设计与能力地图](PROJECT.md)：最终范围、架构、边界、里程碑和验收要求。
-- [第 01 课：项目初始化与 Eino 兼容性验证](lessons/01-project-bootstrap.md)：代码与本地验收完成，真实模型正常调用已验证，待学员练习。
-- [第 02 课：基于 Eino ADK 的工具型 Agent](lessons/02-agent-and-tools.md)：本地实现与验收完成，真实工具调用联调待验证。
-- [第 03 课：API 与运行契约](lessons/03-api-and-run-contract.md)：OpenAPI 与 SSE 示例完成，业务 HTTP 实现待后续课程。
-- [课程文档模板](lessons/TEMPLATE.md)：后续每课沿用的记录结构。
+以下保存当时的学习内容、运行结果与限制，不表示学员已全部掌握。历史路径和示例以当前架构及代码为准。
 
-## 每课记录规则
+| 记录 | 已有基础与待验证内容 |
+|---|---|
+| [01 工程与模型调用](lessons/01-project-bootstrap.md) | 本地验证和真实文本调用有记录；真实异常与取消待补 |
+| [02 工具型 Agent](lessons/02-agent-and-tools.md) | ADK / 工具 / CLI 本地验证有记录；真实供应商工具联调待补 |
+| [03 接口与运行契约](lessons/03-api-and-run-contract.md) | 契约已有，聊天 HTTP / SSE 尚未实现 |
+| [04 PostgreSQL 与迁移](lessons/04-postgresql-and-migrations.md) | 数据库、迁移及事务实验有记录 |
+| [05 登录与用户上下文](lessons/05-login-and-user-context.md) | 认证与用户隔离验证有记录 |
 
-1. 每课独立一份 Markdown，使用两位序号与主题命名。
-2. 开课时写目标、设计、导读、操作步骤与验收条件；课中补充实际操作、错误和取舍；结课时补充结果与复盘。
-3. 区分计划、已经执行和已经验证，不把未运行的命令或示例写成成功结果。
-4. 涉及框架 API 时记录版本与官方依据；涉及源码时记录参考提交和实际文件位置。
-5. 重要步骤提供可复现命令，说明执行目录与预期结果；记录实际结果时去除凭据和私密数据。
-6. 每课包含复盘题和小练习，关联本课新增的项目能力；未完成项带到下一课，不隐去阻塞。
-7. 项目总体方案变化回写 PROJECT.md，课程文档保留当时的取舍及变更理由。
-8. 文档与代码共同提交；内部入口使用相对链接。历史本机环境记录仅作证据，运行时请替换为自己的路径。
+过期的架构整改补充课文已合并到当前架构说明，不再维护多份相互替代的规范。
 
-## 学习进度
+## 学习记录约定
 
-| 课程 | 主题 | 状态 | 完成依据 |
-|---|---|---|---|
-| 01 | 项目初始化与 Eino 兼容性验证 | 代码与本地验收完成，待学员练习 | Go/Eino 核心模型组合通过，Gin 迁移后整体覆盖率 87.2%，真实进程冒烟通过；Gin 协议/恢复回归通过；真实供应商正常调用成功，真实异常/取消待验证 |
-| 02 | 基于 Eino ADK 的工具型 Agent | 本地验收完成，待学员操作 | 工具/ADK/CLI 通过，整体覆盖率 86.5%，真实供应商工具能力待验证 |
-
-后续课程按 [ROADMAP.md](ROADMAP.md) 的 40 节主线推进，复杂模块可拆课；每课围绕可验收成果展开，完整能力范围见 PROJECT.md。
-
-- [应用架构基线与现有代码整改](ARCHITECTURE.md)
-
-- [第 03 课补充实践：执行与输出分离](lessons/03a-execution-and-output.md)
-
-- [第 03 课补充实践：统一应用配置](lessons/03b-unified-config.md)
-
-- [第 03 课补充实践：应用架构综合整改](lessons/03c-architecture-refactor.md)
-
-- [第 03 课补充实践：收敛 Agent 与用户上下文](lessons/03d-agent-user-context.md)（当前架构）
-
-- [接口文件与 SSE 帧说明](api/README.md)
-
-- [第 04 课：PostgreSQL、GORM 与数据库迁移](lessons/04-postgresql-and-migrations.md)（本机验证完成）
-
-- [第 05 课：登录认证与用户上下文](lessons/05-login-and-user-context.md)（真实 HTTP/PostgreSQL 验证通过）
-
-- [第 05 课补充：Boot、YAML 与统一返回结构](lessons/05a-boot-config-response.md)（当前整改，待审阅）
+1. 新专题沿用 A 编号，历史 01–05 不改号；开课时才创建实际课程文件。
+2. 使用 [课程模板](lessons/TEMPLATE.md)，先写核心问题和预测，再记录源码、实验、结果与复盘。
+3. 分别记录代码已有、实验已执行、学员能解释/修改；没有证据的不标完成。
+4. 框架接口记录实际依赖版本和官方依据；源码记录参考提交与文件位置。
+5. 命令写清执行目录，结果去除凭据；不把未执行的计划写成成功。
+6. 复杂逻辑注释解释原因和边界；工程补充服务当前专题。
+7. 当前架构变更回写 ARCHITECTURE.md，长期范围变更回写 PROJECT.md。

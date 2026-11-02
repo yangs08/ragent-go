@@ -35,6 +35,8 @@ func NewAuthService(ctx context.Context) (*AuthService, error) {
 			return nil, define.ServerError("auth schema unavailable; run make migrate", "check auth schema", err)
 		}
 	}
+	// 复用一个占位密码散列：账号不存在时仍执行 bcrypt，缩小与密码错误路径的耗时差异。
+	// 这只能降低基于耗时枚举账号的风险，不保证整个登录过程恒定耗时。
 	dummy, err := bcrypt.GenerateFromPassword([]byte(rand.Text()), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, define.ServerError("认证服务暂不可用", "prepare password verification", err)
@@ -69,7 +71,8 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (def
 		return define.LoginResult{}, define.ServerError("认证服务暂不可用", "generate session token", err)
 	}
 
-	// Database time is authoritative for session lifetime across application nodes.
+	// 有效期的写入和认证判断都使用数据库时钟，避免不同应用节点的时钟偏差。
+	// 仅保存随机 token 的摘要；数据库泄漏不会直接暴露可用于登录的原始 token。
 	session := model.Session{}
 	result := session.Model(ctx).Create(map[string]any{
 		"token_hash": common.TokenHash(token), "user_id": user.ID,
@@ -79,8 +82,8 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (def
 		return define.LoginResult{}, define.ServerError("认证服务暂不可用", "create session", result.Error)
 	}
 
-	// Bounded cleanup; expiry checks do not depend on cleanup having run.
-	// Failure here must not turn a persisted login into a client-visible retry.
+	// 每次最多清理 100 条过期会话，限制登录请求附带的清理工作量；认证仍独立检查有效期。
+	// 此时新会话已经入库，清理失败只记日志，避免把成功登录报告为失败并诱发重复登录。
 	if err := bootstrap.DB.WithContext(ctx).Exec("DELETE FROM auth_sessions WHERE token_hash IN (SELECT token_hash FROM auth_sessions WHERE expires_at <= CURRENT_TIMESTAMP LIMIT 100)").Error; err != nil {
 		bootstrap.Logger.WarnContext(ctx, "session cleanup failed", common.FailureAttrs("cleanup expired sessions", err)...)
 	}

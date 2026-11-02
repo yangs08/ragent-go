@@ -23,7 +23,7 @@ type AgentConfig struct {
 
 YAML 由 yaml.v3 直接解码，环境覆盖和默认值由 github.com/caarlos0/env/v11 映射。只需在结构体增加字段和标签、在对应 YAML 填值，不写 loadAgent 或字段转换表。必要业务检查放在实际使用处，不预设配置 Validate。
 
-优先级：系统环境变量 > .env > YAML > envDefault。现有 .env 未重写，里面原来的普通字段仍会覆盖 YAML。显式空环境变量盖掉低优先级来源，再使用该字段程序默认值或留空，由校验判断必填；不会复活 .env 中被清空的密钥。
+优先级：系统环境变量 > .env > YAML > envDefault。现有 .env 未重写，里面原来的普通字段仍会覆盖 YAML。显式空环境变量盖掉低优先级来源，再使用该字段程序默认值或留空，实际使用处处理调用失败；不会复活 .env 中被清空的密钥。
 
 model.yaml 不允许 api_key，database.yaml 不允许 password：密钥字段 yaml:"-"，只从 RAGENT_MODEL_API_KEY / RAGENT_DB_PASSWORD 读取。未知字段、类型错误、多份 YAML 文档会拒绝加载，错误不回显值。文件缺失时允许默认值/环境覆盖，兼容诊断二进制；正式部署应携带受审查的 YAML。
 
@@ -37,8 +37,8 @@ bootstrap/boot.go 声明 Config、DB、Logger，并由 bootstrap.Boot(ctx) 统�
 
 ## 本地数据库工具
 
-make db-up / make db-stop 调用 cmd/dbdev，使用 common.LoadConfig 读取同一配置，再通过子进程环境交给 Compose。此工具只装载配置，不先连接尚未启动的数据库；其他应用命令统一 Boot。
+make db-up / make db-stop 调用 cmd/dbdev，使用 bootstrap.LoadConfig 读取同一配置，再通过子进程环境交给 Compose。此工具只装载配置，不先连接尚未启动的数据库；其他应用命令统一 Boot。
 
 默认数据库127.0.0.1:15432、库ragent_go、用户ragent，database.enabled=false。密码必填才能创建容器，改变配置不会自动更新已有数据卷的角色密码。不要输出 docker compose config，以免打印密码。初始化、迁移与登录参考第四、第五课。
 
-数据库实体放 internal/model，AI 客户端放 common/model_client.go，共享函数在 internal/common/functions.go。日志统一写 stderr。
+数据库实体放 internal/model，AI 客户端放 internal/service/model.go，共享函数在 internal/common/functions.go。日志统一写 stderr。

@@ -1,5 +1,6 @@
 # 第 05 课：登录认证、持久会话与用户上下文
 
+> 本文保留该课的实现与验证记录；当前目录与装配见 [架构说明](../ARCHITECTURE.md)，后续学习以 [专题路线](../ROADMAP.md) 为准。
 日期：2026-10-29。状态：真实 HTTP + PostgreSQL 验证完成；尚无聊天与会话业务 API。
 
 ## 本课目标
@@ -129,7 +130,3 @@ make auth-smoke
 - [Go bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt)
 - [Go rate limiter](https://pkg.go.dev/golang.org/x/time/rate)
 - [GORM Context](https://gorm.io/docs/context.html)
-
-后续组织调整：普通配置改为 YAML + .env 分层，入口统一 Boot，全局共享启动资源，Result 集中到 common。见 [05a](05a-boot-config-response.md)，旧初始化代码片段按历史阶段理解。
-
-最新目录与入口见 [05a](05a-boot-config-response.md)：Boot(ctx)、model 数据实体、service/model.go，以及 -prompt 联调输入；旧代码片段是当时阶段记录。
