@@ -59,9 +59,9 @@ cmd/agentcheck 直接装配模型、示例工具和服务端 Definition；intern
 
 当前每轮创建 ADK 运行对象、工具预算和调用关联状态；注册的工具可复用，调用时从 context 读取当前用户。Java 参考项目的 UserContext 职责在 Go 中用 context 传递，不用全局用户变量或模拟线程局部状态。Tool Schema 不接受 user_id，数据归属在工具执行时验证。
 
-当前 Runner 使用 EnableStreaming=false，只产生完整步骤消息；内部 tool_call/tool_result/answer 不等同于 HTTP SSE 帧，也不是持久事件总线。展示工具结果须由 Definition 显式开启，原始模型参数不直接输出。允许无工具澄清；答案是否忠实于工具结果仍需独立评估。
+Run 保留非流式单轮行为；RunMessages 使用 Runner.Run 接收完整历史并启用流式，发出带 message_id 的 text_delta 和最终 answer 快照。消息流只读一次，同时合并完整消息；失败返回部分正文但不交出可追加历史。展示工具结果由 Definition 控制，完整工具结果仍保留在可信历史中。内部事件不是 HTTP SSE 帧或持久事件总线，模型答案忠实性仍需独立评估。
 
-模型请求期限、整轮期限、决策轮数和工具调用次数分别约束不同边界。预算属于每轮状态，不存进共享工具或当前用户配置。第一版尚未接入历史和 ADK 中间件，后续学习顺序见 [学习路线](ROADMAP.md)。
+模型请求期限、整轮期限、决策轮数和工具调用次数分别约束不同边界。预算属于每轮状态，不存进共享工具或当前用户配置。CLI 的 -interactive 将历史保存在当前用户的局部会话中，成功后追加，/exit 或 EOF 退出；Ctrl+C 通过主循环监听 context 取消退出 stdin 等待。阻塞输入协程只属于 CLI 进程生命周期，不能用于 HTTP 请求。尚未接入数据库聊天历史、摘要、重试和 ADK 中间件。详见 [本轮实践](lessons/A01-agent-conversation-and-streaming.md)。
 
 ## 配置与阅读入口
 

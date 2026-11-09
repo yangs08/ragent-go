@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import select
 import socket
 import subprocess
 import threading
@@ -86,8 +87,25 @@ def check(workdir):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
-            chunk = {"choices": [{"index": 0, "delta": {"content": "local-eino-ok"}}]}
-            self.wfile.write(("data: " + json.dumps(chunk) + "\n\ndata: [DONE]\n\n").encode())
+            if body.get("tools"):
+                last = body["messages"][-1]
+                if last["role"] == "tool":
+                    deltas = [{"role": "assistant", "content": "A100"}, {"content": " 已发货"}]
+                elif last["content"] == "它发货了吗？":
+                    assert any(m.get("tool_call_id") == "smoke-stream-call" for m in body["messages"])
+                    deltas = [{"role": "assistant", "content": "它已发货"}]
+                else:
+                    deltas = [
+                        {"role": "assistant", "tool_calls": [{"index": 0, "id": "smoke-stream-call", "type": "function", "function": {"name": "get_order", "arguments": '{"order_'}}]},
+                        {"tool_calls": [{"index": 0, "function": {"arguments": 'id":"A100"}'}}]},
+                    ]
+            else:
+                deltas = [{"role": "assistant", "content": "local-eino-ok"}]
+            for delta in deltas:
+                chunk = {"choices": [{"index": 0, "delta": delta}]}
+                self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+                self.wfile.flush()
+            self.wfile.write(b"data: [DONE]\n\n")
         def log_message(self, *args):
             pass
     provider = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
@@ -122,6 +140,39 @@ def check(workdir):
         assert second_model_input["role"] == "tool" and second_model_input["tool_call_id"] == "smoke-order-call"
         assert json.loads(second_model_input["content"])["code"] == "ok"
         print("PASS: agentcheck process -> ADK -> get_order -> correlated tool result -> answer")
+        interactive = subprocess.run([str(ROOT / "bin/agentcheck"), "-interactive"],
+                                     input="它发货了吗？\n/exit\n", env=model_env, cwd=workdir,
+                                     capture_output=True, text=True, timeout=5)
+        assert interactive.returncode == 0, interactive.stderr
+        stream_events = [json.loads(line) for line in interactive.stdout.splitlines()]
+        assert [e["type"] for e in stream_events] == ["tool_call", "tool_result", "text_delta", "text_delta", "answer", "text_delta", "answer"]
+        assert stream_events[2]["message_id"] == stream_events[3]["message_id"] == stream_events[4]["message_id"]
+        assert stream_events[-1]["content"] == "它已发货"
+        assert len(requests) == 6 and len(requests[-1][2]["messages"]) == 6
+        print("PASS: interactive agentcheck -> fragmented tool arguments -> text deltas -> full follow-up history")
+
+        # stdin 保持打开且没有下一行时，SIGINT 也必须能退出读取等待。
+        idle = subprocess.Popen([str(ROOT / "bin/agentcheck"), "-interactive"], env=model_env, cwd=workdir,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            captured = b""
+            deadline = time.monotonic() + 5
+            while b'"type":"answer"' not in captured:
+                remaining = deadline - time.monotonic()
+                assert remaining > 0, "interactive process did not finish its first turn"
+                readable, _, _ = select.select([idle.stdout], [], [], remaining)
+                assert readable, "interactive output timed out"
+                data = os.read(idle.stdout.fileno(), 4096)
+                assert data, "interactive process ended unexpectedly"
+                captured += data
+            idle.send_signal(signal.SIGINT)
+            idle.wait(timeout=3)
+            assert idle.returncode != 0, "cancelled process unexpectedly reported success"
+            print("PASS: SIGINT unblocks interactive stdin waiting")
+        finally:
+            if idle.poll() is None:
+                idle.kill()
+            idle.communicate(timeout=3)
     finally:
         provider.shutdown()
         provider.server_close()

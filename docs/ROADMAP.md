@@ -1,6 +1,6 @@
 # Agent 与 Eino 学习路线：以 Ragent 为参考实现 Go 企业项目
 
-更新：2026-11-02。课程目标按用户本次明确的优先级修订：理解 Agent，掌握 Eino，通过参考 Ragent 的真实机制逐步形成 Go 企业项目。
+更新：2026-11-09。课程目标按用户本次明确的优先级修订：理解 Agent，掌握 Eino，通过参考 Ragent 的真实机制逐步形成 Go 企业项目。
 
 ## 1. 学习主线与项目载体
 
@@ -25,9 +25,9 @@ Agent / Eino 的机制与设计判断决定学习顺序；Go 项目用于承接�
 | 模型与订单 Agent | ChatModelAgent、Runner、InferTool、预算、取消、事件回调 | 能否独立解释完整消息序列、工具结果关联、停止条件；真实工具联调记录仍待补 |
 | HTTP、数据库、认证 | 配置、日志、迁移、可信用户 context | 作为后续实验基础复用，不重讲整套后台开发 |
 | API / SSE 契约 | 已定义路径与事件形状 | 当前无聊天 HTTP / SSE，不把契约当实现 |
-| 历史课程 01–05 与补充 | 保存实现过程与当时验证证据 | 部分目录、状态为历史记录，当前架构以 ARCHITECTURE.md 和代码为准 |
+| 历史课程 01–05 | 保存实现过程与当时验证证据 | 部分目录、状态为历史记录，当前架构以 ARCHITECTURE.md 和代码为准 |
 
-当前 internal/agent/agent.go 使用 EnableStreaming=false 和 runner.Query(ctx, question)，没有向 Runner 传入历史消息，也没有配置 ADK Handlers。因此下一步先深入已有执行器，而不是立即补会话 CRUD。
+2026-11-09 已把多轮与增量能力接入真实项目：保留非流式 Run，新增启用流式的 RunMessages；调用方传入完整历史并接收成功轮次的新消息。CLI 提供 -stream 和 -interactive。详见 [本轮实践](lessons/A01-agent-conversation-and-streaming.md)。尚未接入 ADK Handlers、数据库聊天历史或 HTTP/SSE。
 
 ## 3. 核心专题
 
@@ -50,7 +50,7 @@ A10 是集中复盘和补齐，不是第一次做评估。A01 起保留小型任
 
 多 Agent、AgentAsTool、Sequential/Parallel/Loop、Plan-Execute、DeepAgents 作为后续进阶专题：先用同一任务与单 Agent 比较质量、上下文和成本，再决定是否融入项目。Ragent 未覆盖的机制，明确标注为 Eino 扩展学习，不虚构 Java 对应实现。
 
-## 4. 下一次学习：A01，拆解现有 Agent 的一次执行
+## 4. 当前实践：A01 执行循环、多轮与增量输出
 
 不是重做第二课代码，而是补齐原课尚未证明的理解。
 
@@ -62,7 +62,7 @@ A10 是集中复盘和补齐，不是第一次做评估。A01 起保留小型任
 
 再定向对照 Ragent 的 ReActAgentProvider 和 AgentToolCatalog，以及 Eino v0.9.22 的 adk/chatmodel.go、adk/runner.go、compose/tools_node.go；不要求通读整个仓库。
 
-先预测，再观察以下实验（计划，尚未执行）：
+下列为学习观察清单；本轮多轮、分片工具调用、流失败和取消的实际结果见课文，不把已通过的自动化等同学员已掌握：
 
 - “查询 A100”：工具结果如何成为下一次模型调用的输入？
 - “查询 A100 和 A101”：一个决策轮次能否提出多个调用？以实际轨迹为准，观察结果而不强求模型固定行为。
@@ -93,4 +93,4 @@ A10 是集中复盘和补齐，不是第一次做评估。A01 起保留小型任
 - [Eino Cookbook](https://www.cloudwego.io/docs/eino/cookbook/)：按专题挑选官方示例，不逐个照搬。
 - [Building effective agents](https://www.anthropic.com/research/building-effective-agents)：2024 年文章，借鉴其固定 Workflow 与模型自主决策的区分及简单可组合的设计思路；不作为当前 SDK API 依据。
 
-以上是课程设计参考，不是兼容性验证。本项目保持 Eino v0.9.22；本次核对本地该版本的 Runner.Query/Run、EnableStreaming、Handlers 及相关包存在性。具体接口以该 tag 源码和编译实验为准，不因官网新示例自动升级；MCP 等独立扩展需分别记录版本。当前未执行新的编译、真实模型调用或实验。
+以上是课程设计参考，不是兼容性验证。本项目保持 Eino v0.9.22；本次核对本地该版本的 Runner.Query/Run、EnableStreaming、Handlers 及相关包存在性。具体接口以该 tag 源码和编译实验为准，不因官网新示例自动升级；MCP 等独立扩展需分别记录版本。2026-11-02 的资料核对未产生运行验证；2026-11-09 的实际代码与验证记录见本轮实践，真实供应商联调仍待验证。

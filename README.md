@@ -85,7 +85,7 @@ panic 在响应尚未提交时返回脱敏 500；响应已提交则保留已发�
 make agentcheck
 ```
 
-该命令会真实调用已配置服务，通常包含多次模型请求，可能产生用量；本课自动化验证只访问本地模拟服务。事件按 JSONL 输出：tool_call、tool_result、answer。当前按完整消息显示步骤，不是逐 Token 输出，也不是已经实现 HTTP SSE。
+该命令会真实调用已配置服务，通常包含多次模型请求，可能产生用量；本课自动化验证只访问本地模拟服务。事件按 JSONL 输出：tool_call、tool_result、answer。默认模式按完整消息显示步骤；使用 -stream 可输出文本增量，-interactive 支持进程内多轮历史。尚未实现 HTTP SSE。
 
 开发用户由 CLI 注入为 alice：A100=shipped，A101=delivered；B200 和 C300 属于其他用户，对当前身份均返回 not_found。订单是本地只读演示数据；CLI 注入开发身份，未经过 HTTP 登录认证。
 
@@ -94,6 +94,17 @@ make agentcheck
 执行器支持工具调用与无工具的澄清回答；订单提示词要求具体状态依据查询结果，程序目前不保证自然语言与结果完全一致，答案忠实性与效果评估会继续建设。完整讲解见 [第二课文档](docs/lessons/02-agent-and-tools.md)。
 
 当前职责与执行边界见 [架构说明](docs/ARCHITECTURE.md)。
+
+## 多轮与增量 Agent
+
+```sh
+go run ./cmd/agentcheck -stream -prompt "查询 A100"
+go run ./cmd/agentcheck -interactive -prompt "查询 A100"
+```
+
+交互模式执行首问后，可逐行输入后续问题，例如“它发货了吗？”。/exit 或 EOF 退出，Ctrl+C 取消。stdout 为 JSONL：text_delta 是增量，answer 是最终完整快照，不能再把快照追加到正文。message_id 区分不同 assistant 消息。
+
+历史仅在当前 CLI 进程内存中，只有成功轮次追加完整消息；失败保留已输出的部分正文并退出。仍使用 alice 开发身份，尚无聊天持久化、历史裁剪或 HTTP 聊天。真实命令调用已配置供应商，自动化只使用本地替身。机制、接口与验证见 [A01 实践](docs/lessons/A01-agent-conversation-and-streaming.md)。
 
 ## 项目结构
 

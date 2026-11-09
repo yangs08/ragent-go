@@ -4,11 +4,15 @@
 
 ## 从这里开始
 
-- [学习路线](ROADMAP.md)：核心专题、学习方法和下一次 A01「拆解现有 Agent 的一次执行」。
+- [学习路线](ROADMAP.md)：核心专题与学习方法；当前结合 A01/A03/A04 落实多轮和增量执行。
 - [当前架构](ARCHITECTURE.md)：真实目录、装配、身份、事务和执行边界。
 - [项目设计与能力地图](PROJECT.md)：长期项目范围；交付阶段不等于课程顺序。
 - [接口与 SSE 契约](api/README.md)：区分已实现接口与计划接口。
 - [配置说明](../configs/README.md)：YAML、环境覆盖、密钥和 Boot。
+
+## 当前专题实践
+
+- [A01 多轮消息与增量输出](lessons/A01-agent-conversation-and-streaming.md)：已接入真实 Agent 和 CLI；完整消息历史、部分失败、用户上下文和进程取消验证见课文。
 
 ## 已有课程记录
 
