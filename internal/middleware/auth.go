@@ -9,6 +9,7 @@ import (
 
 	"ragent-go/internal/bootstrap"
 	"ragent-go/internal/common"
+	"ragent-go/internal/define"
 	"ragent-go/internal/service"
 )
 
@@ -18,12 +19,12 @@ func RequireLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		values := c.Request.Header.Values("Authorization")
 		if len(values) != 1 {
-			common.NoAuth(c)
+			common.OutputError(c, define.ClientError("未登录或登录已过期"))
 			return
 		}
 		user, err := service.Auth.Authenticate(c.Request.Context(), values[0])
 		if err != nil {
-			common.Error(c, err)
+			common.OutputError(c, err)
 			return
 		}
 		c.Request = c.Request.WithContext(common.WithUser(c.Request.Context(), user))
@@ -70,7 +71,7 @@ func (l *loginLimiter) allow(c *gin.Context) {
 	}
 	l.mu.Unlock()
 	if !allowed {
-		common.Fail(c, "登录尝试过于频繁，请稍后重试")
+		common.OutputError(c, define.ClientError("登录尝试过于频繁，请稍后重试"))
 		return
 	}
 	c.Next()

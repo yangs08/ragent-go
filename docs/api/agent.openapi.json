@@ -3,7 +3,7 @@
   "info": {
     "title": "Ragent Go Agent API 契约",
     "version": "0.1.0",
-    "description": "依据本地 Ragent 源码整理的实现基准。除 /healthz 外均未实现；认证随第 05 课落地。保留 Ragent 路径、camelCase 字段、Result 与 SSE 事件；不保证已与原前端完整兼容。"
+    "description": "依据 Ragent 接口与当前 Go 实现整理。/healthz 已实现；数据库开启并迁移后提供 /auth/login、/auth/logout、/user/me。Agent 聊天、SSE 和会话接口仍为计划，不保证与原前端完整兼容。"
   },
   "servers": [
     {
@@ -43,6 +43,17 @@
                 }
               }
             }
+          }
+        }
+      },
+      "head": {
+        "operationId": "healthHead",
+        "summary": "HTTP 存活检查（无正文）",
+        "security": [],
+        "x-implementation-status": "implemented",
+        "responses": {
+          "200": {
+            "description": "进程可响应，不检查数据库或模型，无响应正文。"
           }
         }
       }
@@ -356,6 +367,152 @@
         },
         "description": "字段参考 Ragent；framework 在 Go 版应如实返回 Eino，capabilities 只列已实现能力。"
       }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "用户名密码登录",
+        "x-implementation-status": "implemented",
+        "description": "仅在数据库启用且认证初始化成功时注册。HTTP 200 的 code 为 0 才表示成功；客户端错误 A000001，系统错误 B000001。",
+        "responses": {
+          "200": {
+            "description": "业务响应；错误时 data 为 null。",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未提交响应时发生 panic，返回脱敏错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "注销当前会话",
+        "x-implementation-status": "implemented",
+        "description": "仅在数据库启用且认证初始化成功时注册。HTTP 200 的 code 为 0 才表示成功；客户端错误 A000001，系统错误 B000001。",
+        "responses": {
+          "200": {
+            "description": "业务响应；错误时 data 为 null。",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidResult"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未提交响应时发生 panic，返回脱敏错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/me": {
+      "get": {
+        "operationId": "currentUser",
+        "summary": "读取当前登录用户",
+        "x-implementation-status": "implemented",
+        "description": "仅在数据库启用且认证初始化成功时注册。HTTP 200 的 code 为 0 才表示成功；客户端错误 A000001，系统错误 B000001。",
+        "responses": {
+          "200": {
+            "description": "业务响应；错误时 data 为 null。",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResult"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未提交响应时发生 panic，返回脱敏错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -364,7 +521,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "参考 Ragent 前端直接发送登录 token 的约定；不是客户端 userId，不假定 Bearer 前缀。认证实现尚未提供。"
+        "description": "直接发送登录返回的原始 token，不加 Bearer 前缀；服务端查询数据库会话验证身份，不使用客户端传入的 userId。"
       }
     },
     "schemas": {
@@ -899,6 +1056,85 @@
             "properties": {
               "data": {
                 "$ref": "#/components/schemas/EngineMeta"
+              }
+            }
+          }
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 1,
+            "description": "非空且至多 72 字节（不是 72 个 Unicode 字符），不自动 trim。"
+          }
+        },
+        "description": "Gin 默认忽略未知字段；用户名格式在 Controller 检查。读取限制 4 KiB，只解码首个 JSON 值。"
+      },
+      "LoginResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "userId": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "随机会话 token，后续通过 Authorization 原样发送。"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "token"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "CurrentUserResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Result"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "userId": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "username"
+                ]
               }
             }
           }

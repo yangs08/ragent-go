@@ -1,7 +1,7 @@
 # 第 05 课：登录认证、持久会话与用户上下文
 
 > 本文保留该课的实现与验证记录；当前目录与装配见 [架构说明](../ARCHITECTURE.md)，后续学习以 [专题路线](../ROADMAP.md) 为准。
-日期：2026-10-29。状态：真实 HTTP + PostgreSQL 验证完成；尚无聊天与会话业务 API。
+历史验证日期：2026-10-29；实现说明更新：2026-11-22。本次重构尚未复跑真实 PostgreSQL 集成；历史通过记录仅对应当时版本。尚无聊天与会话业务 API。
 
 ## 本课目标
 
@@ -19,17 +19,18 @@ Ragent 登录返回 userId/role/token/avatar，当前 Go 版只提供真实已�
 
 ```text
 POST /auth/login
-  → handler/auth.go：JSON 校验、请求限流
-  → service/AuthService.Login：查用户、校验密码、生成并保存会话
+  → middleware：请求总时限、登录限流
+  → controller.Auth.Login：Gin binding 与用户名格式判断
+  → service.Auth.Login：查用户、校验密码、生成并保存会话
   → JSON Result（token 只在登录响应返回）
 
 GET /user/me 或 POST /auth/logout
   → RequireLogin：读取 Authorization、验证数据库会话
   → common.WithUser(request.Context(), user)
-  → Handler/Service 从同一 context 取得可信用户
+  → Controller/Service 从同一 context 取得可信用户
 ```
 
-internal/service/auth.go 直接使用 GORM，用户映射结构只在此服务使用，暂时保持私有。internal/controller/auth.go 负责协议与中间件，internal/bootstrap/config.go 负责统一配置。没有额外的 Repository/Manager/Provider 层。
+internal/service/auth.go 通过 dao.User/dao.Session 查询，表结构与操作同文件。Controller 负责协议和入参校验，中间件独立处理认证、限流及请求 deadline，bootstrap 负责公共配置和资源。没有额外的 Repository/Manager/Provider 层。
 
 ## 密码与账号创建
 
@@ -89,11 +90,11 @@ Authorization 直接放 token，不加 Bearer，也不从 query 或客户端 use
 
 ## 安全边界
 
-不存在的账号与错误密码统一提示，未找到用户时也执行一次 dummy bcrypt 校验，减少基于耗时的账号枚举；这不是绝对恒定时间保证。请求 JSON 限制 4 KiB，拒绝未知字段和多个顶层 JSON 值。数据库查询使用参数绑定，原始数据库错误不返回客户端。
+不存在的账号与错误密码统一提示，未找到用户时也执行一次 dummy bcrypt 校验，减少基于耗时的账号枚举；这不是绝对恒定时间保证。登录使用 MaxBytesReader 限制读取至 4 KiB，直接使用 Gin ShouldBindJSON；按 Gin 默认行为忽略未知字段，只解码首个 JSON 值，不额外验证尾随内容或 Content-Type。必填和长度由 binding 校验，用户名格式由 Controller 判断，额外传入 userId 不决定身份。数据库查询使用参数绑定，原始数据库错误不返回客户端。
 
 登录按真实客户端 IP 使用 golang.org/x/time/rate 限流：默认每分钟补充 10 次，最多突发 10 次，成功/失败都消耗名额。最多保存 1024 个 IP 状态，惰性清理；容量满时拒绝新来源。当前不信任代理头，避免通过伪造 X-Forwarded-For 绕过限制。多实例统一限流、账户维度治理和可信代理配置仍在后续课程。
 
-默认会话 24h；认证查询默认 5s 期限。每次登录最多清理 100 条已过期会话，有效性判断不依赖清理任务。尚无密码修改、全端登出、会话数量上限与独立过期清理任务，后续按需求补齐。
+默认会话 24h；整个 HTTP 请求链默认 5s 期限，由 Server.RequestTimeout 统一控制，认证和业务操作共用同一个 deadline。每次登录最多清理 100 条已过期会话，有效性判断不依赖清理任务。尚无密码修改、全端登出、会话数量上限与独立过期清理任务，后续按需求补齐。
 
 Go bcrypt 运算本身不能被 context 强制中断；请求取消/超时会阻止随后数据库操作，不承诺密码计算瞬停。登录限流降低计算滥用，仍需部署层的总连接与请求治理。
 
@@ -107,17 +108,17 @@ HTTP 使用 header token，不设置认证 Cookie；未来前端应避免将 tok
 make auth-smoke
 ```
 
-该命令从本项目 ragent-go-study-postgres-1 容器取得临时连接设置，不修改 .env，不操作其他项目数据库。创建两个随机测试账号，启动真实服务，验证正常/错误登录、严格 JSON、限流、用户隔离、伪造/过期/撤销 token、重启保留、密码散列、token 摘要及日志无凭据。最后仅删除自己的随机账号，会话由外键级联清理。它不是生产数据库上的检测命令。
+该命令从本项目 ragent-go-study-postgres-1 容器取得临时连接设置，不修改 .env，不操作其他项目数据库。创建两个随机测试账号，启动真实服务，验证正常/错误登录、必填参数、额外身份字段不生效、限流、用户隔离、伪造/过期/撤销 token、重启保留、密码散列、token 摘要及日志无凭据。最后仅删除自己的随机账号，会话由外键级联清理。它不是生产数据库上的检测命令。
 
-本次实测全部通过；已有 race 回归、vet、离线冒烟与模块校验也通过。测试只聚焦关键行为，没有为字段传递添加镜像测试；Python 进程集成不计入 go test 的覆盖率，不将覆盖率数字当作本课结论。
+2026-10-29 当时版本实测全部通过；已有 race 回归、vet、离线冒烟与模块校验也通过。测试只聚焦关键行为，没有为字段传递添加镜像测试；Python 进程集成不计入 go test 的覆盖率，不将覆盖率数字当作本课结论。
 
 **本机配置现状**：执行本课时发现 .env 的 RAGENT_DB_ENABLED=false 且密码为空，已保留未改。验证使用专属容器的临时参数。要手动使用登录接口，请先配置正确的数据库连接、设置 RAGENT_DB_ENABLED=true，再执行 make migrate 和 make run。
 
 ## 阅读顺序与复盘
 
 1. migrations/00002_create_auth_sessions.sql：会话与用户的关系、有效期和索引。
-2. service/auth.go：账号创建、Login、Authenticate、Logout。
-3. handler/auth.go：JSON、Result、RequireLogin 与限流。
+2. internal/service/auth.go 与 user.go：登录认证、会话与账号创建。
+3. internal/controller/auth.go 与 middleware/：参数绑定、用户名格式、Result、认证、限流和请求时限。
 4. common/user.go：可信身份如何随标准 context 传到底层。
 5. cmd/server/main.go 与 cmd/usercreate/main.go：真实依赖装配和账号初始化。
 

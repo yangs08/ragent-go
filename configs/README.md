@@ -31,7 +31,7 @@ model.yaml 不允许 api_key，database.yaml 不允许 password：密钥字段 y
 
 ## Boot 与资源
 
-bootstrap/boot.go 声明 Config、DB、Logger，并由 bootstrap.Boot(ctx) 统一初始化。Service 从 bootstrap.DB / bootstrap.Config 取得资源，运行期间只读；用户身份与事务仍分别在请求 context 和局部 tx 中。停止请求和后台工作后执行 Boot 返回的 cleanup。
+bootstrap/boot.go 声明 Config、DB、Logger，并由 bootstrap.Boot(ctx) 统一初始化。Service 直接读取 bootstrap.Config 对应配置；DAO 表入口使用 bootstrap.DB，事务优先使用表入口 Transaction(ctx, callback)，外部已有事务用 dao.WithTx(ctx, tx) 接入，公共 Logger 可直接使用，运行期间只读；用户身份与事务仍分别在请求 context 和局部 tx 中。停止请求和后台工作后执行 Boot 返回的 cleanup。
 
 没有 global 目录；define/ 只按业务放共享配置、认证请求/结果与返回结构，不负责打开连接或启动服务。数据库适配器依赖 define.DatabaseConfig，避免 common 和初始化代码循环依赖。
 
@@ -41,4 +41,10 @@ make db-up / make db-stop 调用 cmd/dbdev，使用 bootstrap.LoadConfig 读取�
 
 默认数据库127.0.0.1:15432、库ragent_go、用户ragent，database.enabled=false。密码必填才能创建容器，改变配置不会自动更新已有数据卷的角色密码。不要输出 docker compose config，以免打印密码。初始化、迁移与登录参考第四、第五课。
 
-数据库实体放 internal/model，AI 客户端放 internal/service/model.go，共享函数在 internal/common/functions.go。日志统一写 stderr。
+数据库表结构与查询一起放 internal/dao，AI 客户端放 internal/resource/model.go，公共函数按职责放在 internal/common 的 response/context/token/log 文件中。日志统一写 stderr。
+
+## 超时边界
+
+普通 HTTP 请求统一使用 server.yaml 的 request_timeout（默认 5s），环境覆盖为 RAGENT_REQUEST_TIMEOUT。原 auth.yaml 的 request_timeout 和 RAGENT_AUTH_REQUEST_TIMEOUT 已移除，部署覆盖需迁移到新配置。RequestTimeout 中间件设置整条请求链的 context deadline，Service/DAO 不再反复创建超时 context。请求结束会释放 context；上游更短的 deadline 和取消信号仍然有效。
+
+这是协作式取消，不是强制终止 handler 或连接读写超时；下游操作需使用传入 ctx。CLI 在命令入口设置总时限，认证初始化在 server 启动入口使用 database.connect_timeout。model.timeout、agent.timeout、database.connect_timeout、server.shutdown_timeout 分别控制模型调用、Agent 执行、数据库连接与启动检查、优雅退出，保留独立配置。未来流式 HTTP 接口需按其执行时长选择请求预算。

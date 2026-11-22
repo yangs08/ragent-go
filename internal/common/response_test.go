@@ -16,9 +16,9 @@ import (
 )
 
 func TestFailureResponsesAbortAndRedact(t *testing.T) {
-	old := bootstrap.Logger
-	defer func() { bootstrap.Logger = old }()
 	var logs bytes.Buffer
+	old := bootstrap.Logger
+	t.Cleanup(func() { bootstrap.Logger = old })
 	bootstrap.Logger = slog.New(slog.NewJSONHandler(&logs, nil))
 	cause := &pgconn.PgError{Code: "08006", Message: "private-token-and-sql"}
 	failure := define.ServerError("认证服务暂不可用", "find login user", cause)
@@ -27,7 +27,7 @@ func TestFailureResponsesAbortAndRedact(t *testing.T) {
 	}
 	r := gin.New()
 	reached := false
-	r.Use(func(c *gin.Context) { c.Header("X-Request-ID", "test-request"); Error(c, failure) })
+	r.Use(func(c *gin.Context) { c.Header("X-Request-ID", "test-request"); OutputError(c, failure) })
 	r.GET("/", func(c *gin.Context) { reached = true })
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
@@ -46,7 +46,7 @@ func TestFailureResponsesAbortAndRedact(t *testing.T) {
 func TestNoAuthAborts(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	NoAuth(c)
+	OutputError(c, define.ClientError("未登录或登录已过期"))
 	if !c.IsAborted() || w.Code != 200 || !strings.Contains(w.Body.String(), define.CodeClientError) {
 		t.Fatal("invalid unauthenticated response")
 	}
@@ -60,7 +60,7 @@ func TestErrorPreservesCommittedResponse(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Status(202)
 	_, _ = c.Writer.WriteString("partial")
-	Error(c, define.ClientError("rejected"))
+	OutputError(c, define.ClientError("rejected"))
 	if !c.IsAborted() || w.Code != 202 || w.Body.String() != "partial" {
 		t.Fatal("error replaced or appended to committed output")
 	}

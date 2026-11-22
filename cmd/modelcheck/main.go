@@ -11,7 +11,7 @@ import (
 	"syscall"
 
 	"ragent-go/internal/bootstrap"
-	"ragent-go/internal/service"
+	"ragent-go/internal/resource"
 )
 
 const defaultPrompt = "请用一句话解释什么是 Agent。"
@@ -42,13 +42,13 @@ func runCheck(ctx context.Context, prompt string, output io.Writer) error {
 	if output == nil {
 		return errors.New("model output is required")
 	}
-	client, err := service.NewModelClient(ctx, bootstrap.Config.Model)
+	client, err := resource.NewModelClient(ctx, bootstrap.Config.Model)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, bootstrap.Config.Model.Timeout)
 	defer cancel()
-	return service.StreamModelText(ctx, client, prompt, func(text string) error {
+	return resource.StreamModelText(ctx, client, prompt, func(text string) error {
 		n, err := io.WriteString(output, text)
 		if err != nil {
 			return err

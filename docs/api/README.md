@@ -92,3 +92,11 @@ Controller 解析 HTTP、调用 Service、输出 SSE。AgentChatService 取得�
 OpenAPI 只描述请求与响应，不能约束 SSE 帧的时间顺序；x-sse-events 是说明性扩展，流协议以本文和实际集成验证共同验收。不声称已与 Ragent 前端完全兼容。
 
 认证实现与字段差异详见 [第五课](../lessons/05-login-and-user-context.md)。
+
+## 已实现认证接口的入参规则
+
+登录使用 Gin ShouldBindJSON，username/password 必填；用户名为 3..64 位 ASCII 字母数字及 _.-，首位须字母或数字。密码上限为 72 字节；账号创建要求至少 12 字节且非全空白，仅提供操作员 CLI。登录读取限制为 4 KiB，遵循 Gin 默认 JSON 解析，不额外拒绝未知字段或检查尾随内容；未知 userId 不会成为可信身份。
+
+参数绑定失败返回 A000001 / “请求参数不合法”，用户名格式或凭据错误返回 A000001 / “用户名或密码错误”。当前用户及注销必须使用 Authorization 中的原始 token。普通响应带 Cache-Control: no-store 和与 requestId 对应的 X-Request-ID；panic 在尚未写响应时返回 HTTP 500。认证路由仅在数据库启用且初始化成功时注册。
+
+普通 HTTP 请求默认共用 5s context deadline，配置为 server.request_timeout / RAGENT_REQUEST_TIMEOUT；不是超时立即中断 handler 的保证。计划中的 SSE 接入需另行确定适合流式执行的时限。

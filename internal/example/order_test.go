@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	functions "ragent-go/internal/common"
+	"ragent-go/internal/common"
 	"ragent-go/internal/define"
 )
 
@@ -177,5 +177,5 @@ func TestDemoOrdersRespectsContextAndUser(t *testing.T) {
 }
 
 func aliceContext() context.Context {
-	return functions.WithUser(context.Background(), define.User{ID: "alice"})
+	return common.WithUser(context.Background(), define.User{ID: "alice"})
 }

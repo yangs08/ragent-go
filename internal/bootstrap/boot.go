@@ -9,7 +9,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"ragent-go/internal/database"
 	"ragent-go/internal/define"
 )
 
@@ -37,7 +36,7 @@ func Boot(ctx context.Context) (func(), error) {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.Server.LogLevel}))
 	var db *gorm.DB
 	if cfg.Database.Enabled {
-		db, err = database.Open(ctx, cfg.Database)
+		db, err = openDatabase(ctx, cfg.Database)
 		if err != nil {
 			return nil, err
 		}
@@ -46,6 +45,7 @@ func Boot(ctx context.Context) (func(), error) {
 	Config = cfg
 	DB = db
 	Logger = logger
+	slog.SetDefault(logger)
 	booted = true
 	var once sync.Once
 	return func() {
@@ -60,7 +60,6 @@ func Boot(ctx context.Context) (func(), error) {
 			}
 			DB = nil
 			Config = define.Config{}
-			Logger = slog.Default()
 			booted = false
 		})
 	}, nil

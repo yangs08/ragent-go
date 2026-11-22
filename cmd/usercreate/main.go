@@ -10,9 +10,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin/binding"
 	"golang.org/x/term"
 
 	"ragent-go/internal/bootstrap"
+	"ragent-go/internal/define"
 	"ragent-go/internal/service"
 )
 
@@ -38,6 +40,13 @@ func run(username string) error {
 		}
 		password = string(raw)
 	}
+	request := define.CreateUserRequest{Username: username, Password: password}
+	if err := binding.Validator.ValidateStruct(request); err != nil {
+		return define.ClientError("用户名须为 3..64 位字母数字及 _.-；密码须为 12..72 字节且非全空白")
+	}
+	if !define.UsernamePattern.MatchString(request.Username) {
+		return define.ClientError("用户名须以字母或数字开头，且仅包含字母数字及 _.-")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cleanup, err := bootstrap.Boot(ctx)
@@ -49,8 +58,7 @@ func run(username string) error {
 		return errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
 	}
 
-	users := service.UserService{}
-	id, err := users.Create(ctx, username, password)
+	id, err := service.User.Create(ctx, request)
 	if err != nil {
 		return err
 	}

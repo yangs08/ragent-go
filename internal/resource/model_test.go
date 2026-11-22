@@ -1,4 +1,4 @@
-package service
+package resource
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/eino-ext/components/model/openai"
 
 	"ragent-go/internal/define"
 )
@@ -109,6 +111,12 @@ data: {"error":{"message":"private-value","type":"server_error"}}
 			default:
 				if !errors.Is(err, ErrModelProvider) {
 					t.Fatalf("error=%v", err)
+				}
+			}
+			if kind == "provider error" {
+				var apiError *openai.APIError
+				if !errors.As(err, &apiError) || apiError.HTTPStatusCode != 500 {
+					t.Fatal("provider diagnostic was discarded")
 				}
 			}
 			if kind == "midstream error" && output.String() != "partial" {

@@ -12,7 +12,7 @@ func TestYAMLAndEnvironmentPriority(t *testing.T) {
 	dir := t.TempDir()
 	yamlPath := filepath.Join(dir, "server.yaml")
 	envPath := filepath.Join(dir, ".env")
-	if err := os.WriteFile(yamlPath, []byte("http_addr: 127.0.0.1:9090\n"), 0600); err != nil {
+	if err := os.WriteFile(yamlPath, []byte("http_addr: 127.0.0.1:9090\nrequest_timeout: 9s\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "agent.yaml"), []byte("timeout: 2s\nmax_tool_calls: 4\n"), 0600); err != nil {
@@ -22,6 +22,9 @@ func TestYAMLAndEnvironmentPriority(t *testing.T) {
 		t.Fatal(err)
 	}
 	lookup, err := LookupEnvironment(envPath, func(k string) (string, bool) {
+		if k == "RAGENT_REQUEST_TIMEOUT" {
+			return "3s", true
+		}
 		if k == "RAGENT_HTTP_ADDR" {
 			return "127.0.0.1:9092", true
 		}
@@ -34,7 +37,7 @@ func TestYAMLAndEnvironmentPriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Server.HTTPAddr != "127.0.0.1:9092" || cfg.Agent.Timeout != 2*time.Second || cfg.Agent.MaxToolCalls != 2 || cfg.Database.Enabled {
+	if cfg.Server.RequestTimeout != 3*time.Second || cfg.Server.HTTPAddr != "127.0.0.1:9092" || cfg.Agent.Timeout != 2*time.Second || cfg.Agent.MaxToolCalls != 2 || cfg.Database.Enabled {
 		t.Fatal("configuration layer precedence failed")
 	}
 }

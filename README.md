@@ -2,7 +2,7 @@
 
 基于 **Go、Gin 和 Eino** 的 Agentic RAG 工程实践项目。参考 [Ragent](https://github.com/nageoffer/ragent) 的能力与设计，面向 Go 开发者，通过逐课实现、源码导读、测试和故障实验，逐步建设完整的企业级 AI 应用平台。
 
-项目以 [Agent / Eino 专题学习](docs/ROADMAP.md) 为主线，参考 Ragent 源码并通过 Go 项目验证理解，目标覆盖知识入库、混合检索、RAG、Agent 工具调用、MCP、Skills、会话与长期记忆、人工确认、权限隔离、可观测性和部署验收。**已有工具型 Agent CLI、工程底座和数据库登录认证；聊天 HTTP / SSE、知识检索与完整平台仍待实现。**
+项目以 [Agent / Eino 专题学习](docs/ROADMAP.md) 为主线，参考 Ragent 源码并通过 Go 项目验证理解，目标覆盖知识入库、混合检索、RAG、Agent 工具调用、MCP、Skills、会话与长期记忆、人工确认、权限隔离、可观测性和部署验收。**已有工具型 Agent CLI、工程底座和数据库登录认证；已接入固定演示语料的知识检索工具；聊天 HTTP / SSE、真实知识索引与完整平台仍待实现。**
 
 这是独立的 Go 学习与实现项目，与参考项目不存在官方隶属关系。已实现能力和后续计划分别记录在下方及课程路线中。
 
@@ -14,7 +14,7 @@
 
 - YAML / .env 配置加载与类型解析，默认只监听 `127.0.0.1:8080`。
 - Gin v1.12.0 路由与中间件，`/healthz`、JSON 日志与服务端生成的请求标识。
-- 请求完成状态记录、脱敏 panic 恢复与显式代理信任策略。
+- 请求完成状态记录、统一请求 deadline、脱敏 panic 恢复与显式代理信任策略。
 - SIGINT/SIGTERM 后限时等待在途 HTTP 请求，超时强制关闭。
 - Eino 真实适配器的独立模型验证命令，包含流式消费、整体超时和取消。
 - 本地模拟供应商集成测试，不需要真实 API Key。
@@ -69,7 +69,7 @@ make smoke
 
 ## HTTP 框架边界
 
-Gin 负责路由与中间件，作为 http.Handler 交给现有 http.Server。端口监听、超时和优雅退出仍由 internal/bootstrap 管理，不调用 router.Run() 启动另一个服务。
+Gin 负责路由与中间件，作为 http.Handler 交给现有 http.Server。端口监听、连接参数和优雅退出由 internal/bootstrap 管理，请求总时限由中间件设置，不调用 router.Run() 启动另一个服务。
 
 进程入口将 Gin 设置为 release 模式，应用日志级别继续由 RAGENT_LOG_LEVEL 控制。使用 gin.New() 显式装配中间件，默认不信任代理头；需要反向代理时再显式配置可信代理。
 
@@ -106,12 +106,20 @@ go run ./cmd/agentcheck -interactive -prompt "查询 A100"
 
 历史仅在当前 CLI 进程内存中，只有成功轮次追加完整消息；失败保留已输出的部分正文并退出。仍使用 alice 开发身份，尚无聊天持久化、历史裁剪或 HTTP 聊天。真实命令调用已配置供应商，自动化只使用本地替身。机制、接口与验证见 [A01 实践](docs/lessons/A01-agent-conversation-and-streaming.md)。
 
+## 订单与知识联合问答
+
+```sh
+go run ./cmd/agentcheck -stream -prompt "查询 A100 的状态，并检索演示退货政策说明下一步"
+```
+
+Agent 可调用 get_order 获取事实，再调用 search_knowledge 获取带来源和版本的证据。知识工具使用 Eino Retriever 接口，当前仅有两篇固定关键词演示政策，不能当作真实商家规定，也不能仅凭订单状态判断退款资格；不执行申请或退款。完整机制与验证边界见 [A02 实践](docs/lessons/A02-knowledge-tool-and-agentic-rag.md)。
+
 ## 项目结构
 
 ```text
 cmd/           server、modelcheck、agentcheck 命令入口
 internal/      HTTP、配置、模型、Agent 与受控工具实现
-configs/       配置字段说明
+configs/       按模块拆分的 YAML 默认配置与配置说明
 scripts/       本地进程冒烟验证
 docs/          项目设计、Agent / Eino 专题路线、逐课讲解与验收记录
 ```
@@ -134,7 +142,7 @@ make migrate-status
 make dbcheck
 ```
 
-使用独立 SQL 迁移，不在应用启动时 AutoMigrate。当前本机连接、重复迁移、事务回滚与数据库启用后的服务退出已验证。数据库健康不是 /healthz 的检查内容，登录已在第五课接入，聊天会话仍待实现。详见 [第四课](docs/lessons/04-postgresql-and-migrations.md)。
+使用独立 SQL 迁移，不在应用启动时 AutoMigrate。历史第四课记录了本机连接、重复迁移、事务回滚与数据库启用后的服务退出验证；本次架构重构尚未复跑真实 PostgreSQL 集成。数据库健康不是 /healthz 的检查内容，登录已在第五课接入，聊天会话仍待实现。详见 [第四课](docs/lessons/04-postgresql-and-migrations.md)。
 
 ## 第五课：登录认证
 
@@ -144,6 +152,8 @@ make dbcheck
 
 ## 配置与启动约定
 
-普通配置在 configs/*.yaml，密钥和本机覆盖在 .env。bootstrap.Boot(ctx) 初始化 Config、DB、Logger；业务返回统一使用 define.Result 和 common/response.go。数据库实体在 internal/model，AI 客户端在 internal/service/model.go，共享函数在 internal/common/functions.go。
+普通配置在 configs/*.yaml，密钥和本机覆盖在 .env。bootstrap 统一配置、数据库和日志初始化；common 按文件提供响应、用户 context、token 与日志诊断；resource/model.go 封装模型客户端。业务采用 Controller → Service → DAO，表结构和操作集中在每个 DAO 文件中。直接使用 dao.User/dao.Session，事务优先用 dao.User.Transaction(ctx, callback)，已有事务用 dao.WithTx(ctx, tx) 接入，业务配置直接从 bootstrap.Config 读取，公共 Logger 不逐层传递。完整封装规则见 [当前架构](docs/ARCHITECTURE.md)。
 
 配置详情见 [配置说明](configs/README.md)，职责与生命周期见 [架构说明](docs/ARCHITECTURE.md)。
+
+HTTP 总时限配置为 `configs/server.yaml` 的 `request_timeout`，默认 5s，可用 `RAGENT_REQUEST_TIMEOUT` 覆盖。旧 `auth.request_timeout` / `RAGENT_AUTH_REQUEST_TIMEOUT` 已移除，已有部署配置需迁移。该时限通过 context 协作式取消，不强制中断 handler；模型、Agent 和退出超时独立配置。参数绑定直接使用 Gin，用户名格式在 Controller/CLI 判断，Service 接收已校验入参。

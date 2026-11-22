@@ -89,7 +89,18 @@ def check(workdir):
             self.end_headers()
             if body.get("tools"):
                 last = body["messages"][-1]
-                if last["role"] == "tool":
+                if any(m.get("role") == "user" and m.get("content") == "查询 A100 并检索演示退货政策" for m in body["messages"]):
+                    assert {t["function"]["name"] for t in body["tools"]} == {"get_order", "search_knowledge"}
+                    results = {m["tool_call_id"]: json.loads(m["content"]) for m in body["messages"] if m["role"] == "tool"}
+                    if "joint-knowledge" in results:
+                        assert results["joint-order"]["order"]["status"] == "shipped"
+                        assert any(e["source_id"] == "demo-returns-v1" and e["version"] == "demo-v1" for e in results["joint-knowledge"]["evidence"])
+                        assert len(body["messages"]) == 6
+                        deltas = [{"role": "assistant", "content": "A100 已发货；演示政策要求核实是否签收 [demo-returns-v1]。"}]
+                    else:
+                        name, call_id, args = ("search_knowledge", "joint-knowledge", {"query": "A100 已发货，退货政策"}) if "joint-order" in results else ("get_order", "joint-order", {"order_id": "A100"})
+                        deltas = [{"role": "assistant", "tool_calls": [{"index": 0, "id": call_id, "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}]}]
+                elif last["role"] == "tool":
                     deltas = [{"role": "assistant", "content": "A100"}, {"content": " 已发货"}]
                 elif last["content"] == "它发货了吗？":
                     assert any(m.get("tool_call_id") == "smoke-stream-call" for m in body["messages"])
@@ -150,6 +161,15 @@ def check(workdir):
         assert stream_events[-1]["content"] == "它已发货"
         assert len(requests) == 6 and len(requests[-1][2]["messages"]) == 6
         print("PASS: interactive agentcheck -> fragmented tool arguments -> text deltas -> full follow-up history")
+
+        joint = subprocess.run([str(ROOT / "bin/agentcheck"), "-stream", "-prompt", "查询 A100 并检索演示退货政策"],
+                               env=model_env, cwd=workdir, capture_output=True, text=True, timeout=5)
+        assert joint.returncode == 0, joint.stderr
+        joint_events = [json.loads(line) for line in joint.stdout.splitlines()]
+        assert [e["tool_call_id"] for e in joint_events if e["type"] == "tool_result"] == ["joint-order", "joint-knowledge"]
+        assert "[demo-returns-v1]" in joint_events[-1]["content"]
+        assert len(requests) == 9
+        print("PASS: joint order + knowledge tools -> bounded source evidence -> streamed answer")
 
         # stdin 保持打开且没有下一行时，SIGINT 也必须能退出读取等待。
         idle = subprocess.Popen([str(ROOT / "bin/agentcheck"), "-interactive"], env=model_env, cwd=workdir,

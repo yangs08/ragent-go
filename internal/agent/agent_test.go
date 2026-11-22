@@ -18,7 +18,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	functions "ragent-go/internal/common"
+	"ragent-go/internal/common"
 	"ragent-go/internal/define"
 	"ragent-go/internal/example"
 )
@@ -309,7 +309,7 @@ func TestAgentSharedToolsUseCurrentUser(t *testing.T) {
 		toolResponse(w, `{"order_id":"A100"}`)
 	}, testOptions())
 	for _, tt := range []struct{ user, code string }{{"alice", "ok"}, {"bob", "not_found"}, {"alice", "ok"}} {
-		ctx := functions.WithUser(context.Background(), define.User{ID: tt.user})
+		ctx := common.WithUser(context.Background(), define.User{ID: tt.user})
 		code := ""
 		err := assistant.Run(ctx, "查询 A100", func(e Event) error {
 			if e.Type == "tool_result" {
@@ -353,5 +353,5 @@ func TestExecutorSupportsOtherToolsWithoutExposingResultsByDefault(t *testing.T)
 }
 
 func aliceContext() context.Context {
-	return functions.WithUser(context.Background(), define.User{ID: "alice"})
+	return common.WithUser(context.Background(), define.User{ID: "alice"})
 }

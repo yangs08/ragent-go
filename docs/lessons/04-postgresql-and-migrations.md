@@ -19,7 +19,7 @@ Ragent 的 application.yaml 配置 PostgreSQL 数据源，UserDO 使用 MyBatis-
 
 ```text
 internal/bootstrap/config.go  数据库配置与校验
-internal/database/postgres.go GORM 初始化与连接池配置
+internal/bootstrap/database.go GORM 初始化与连接池配置
 migrations/00001_create_users.sql 第一份结构迁移
 migrations/embed.go          将 SQL 嵌入迁移命令
 cmd/migrate/main.go          显式 status/up 命令
@@ -36,7 +36,7 @@ cmd/server/main.go          启用数据库时连接、启动检查、退出关�
 
 当前默认最大连接 10、空闲连接 5、连接最长寿命 30m、最大空闲时间 5m。多实例部署时总连接数约为实例数乘以每实例池上限，不能只看单实例。当前值是开发起点，不是生产容量结论。
 
-Open 在指定期限内 Ping，连接失败会在监听 HTTP 前报错；初始化失败清理连接。SQL 日志默认关闭，避免打印 SQL 参数与敏感数据；对外不回显连接串或密码。远程连接要求 verify-full，本机回环可使用 disable。
+openDatabase 在指定期限内 Ping，连接失败会在监听 HTTP 前报错；初始化失败清理连接。SQL 日志默认关闭，避免打印 SQL 参数与敏感数据；对外不回显连接串或密码。远程连接要求 verify-full，本机回环可使用 disable。
 
 ## 本地数据库
 

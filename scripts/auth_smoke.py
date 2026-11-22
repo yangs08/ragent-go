@@ -118,7 +118,11 @@ def main():
         wrong = call("POST", "/auth/login", {"username": names[0], "password": "wrong-password"})
         assert missing["code"] == wrong["code"] == "A000001"
         assert missing["message"] == wrong["message"]
-        assert call("POST", "/auth/login", {"username": names[0], "password": password, "userId": ids[1]})["code"] != "0"
+        # Gin ignores unknown fields; identity must still come from the authenticated account.
+        extra = call("POST", "/auth/login", {"username": names[0], "password": password, "userId": ids[1]})
+        assert extra["code"] == "0" and extra["data"]["userId"] == ids[0]
+        tokens.append(extra["data"]["token"])
+        assert call("GET", "/user/me", token=tokens[-1])["data"]["userId"] == ids[0]
         assert call("POST", "/auth/login", raw=b'{}{}')["code"] != "0"
         limited = call("POST", "/auth/login", {"username": names[0], "password": password})
         assert limited["code"] != "0" and "频繁" in limited["message"]
@@ -144,7 +148,7 @@ def main():
         stop()
         for private in [password, *tokens]:
             assert private not in "".join(logs), "credential leaked to application logs"
-        print("PASS: login, credential errors, strict input, rate limit, per-user context, forged/expired/revoked tokens")
+        print("PASS: login, credential errors, input binding, rate limit, per-user context, forged/expired/revoked tokens")
         print("PASS: password hashing, token digest storage, session survives restart, secrets absent from logs")
     finally:
         if process is not None:

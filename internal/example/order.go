@@ -11,7 +11,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 
-	functions "ragent-go/internal/common"
+	"ragent-go/internal/common"
 )
 
 type orderInput struct {
@@ -75,7 +75,7 @@ func queryOrder(ctx context.Context, store OrderStore, id string) (OrderResult, 
 	if err := ctx.Err(); err != nil {
 		return OrderResult{}, err
 	}
-	user, err := functions.RequireUser(ctx)
+	user, err := common.RequireUser(ctx)
 	if err != nil {
 		return OrderResult{}, err
 	}
@@ -96,25 +96,4 @@ func queryOrder(ctx context.Context, store OrderStore, id string) (OrderResult, 
 		return OrderResult{Code: "not_found", Message: "订单不存在或无权访问"}, nil
 	}
 	return OrderResult{Code: "ok", Order: &OrderView{OrderID: value.ID, Status: value.Status}}, nil
-}
-
-type demoOrders map[string]Order
-
-func DemoOrders() OrderStore {
-	return demoOrders{
-		"A100": {ID: "A100", UserID: "alice", Status: "shipped"},
-		"A101": {ID: "A101", UserID: "alice", Status: "delivered"},
-		"B200": {ID: "B200", UserID: "bob", Status: "pending"},
-		"C300": {ID: "C300", UserID: "carol", Status: "delivered"},
-	}
-}
-func (s demoOrders) Find(ctx context.Context, userID, id string) (Order, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return Order{}, false, err
-	}
-	value, found := s[id]
-	if !found || value.UserID != userID {
-		return Order{}, false, nil
-	}
-	return value, true, nil
 }

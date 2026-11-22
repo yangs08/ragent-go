@@ -1,4 +1,4 @@
-package database
+package bootstrap
 
 import (
 	"context"
@@ -15,9 +15,9 @@ import (
 	"ragent-go/internal/define"
 )
 
-// Open creates one shared SQL pool, validates connectivity within a deadline,
+// openDatabase creates one shared SQL pool, validates connectivity within a deadline,
 // and returns a GORM handle. The process owner must close its underlying sql.DB.
-func Open(ctx context.Context, cfg define.DatabaseConfig) (*gorm.DB, error) {
+func openDatabase(ctx context.Context, cfg define.DatabaseConfig) (*gorm.DB, error) {
 	if !cfg.Enabled {
 		return nil, errors.New("database is disabled; set RAGENT_DB_ENABLED=true")
 	}

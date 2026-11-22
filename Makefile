@@ -14,12 +14,7 @@ vet:
 	$(GO) vet ./...
 
 build:
-	$(GO) build -o bin/server ./cmd/server
-	$(GO) build -o bin/modelcheck ./cmd/modelcheck
-	$(GO) build -o bin/agentcheck ./cmd/agentcheck
-	$(GO) build -o bin/migrate ./cmd/migrate
-	$(GO) build -o bin/dbcheck ./cmd/dbcheck
-	$(GO) build -o bin/usercreate ./cmd/usercreate
+	$(GO) build -o bin/ ./cmd/...
 
 fmt:
 	$(GO) fmt ./...

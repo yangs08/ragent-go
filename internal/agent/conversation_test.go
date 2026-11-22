@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -14,9 +15,8 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
-	"net/http"
 
-	functions "ragent-go/internal/common"
+	"ragent-go/internal/common"
 	"ragent-go/internal/define"
 	"ragent-go/internal/example"
 )
@@ -246,7 +246,7 @@ func TestConversationDoesNotShareHistoryOrIdentity(t *testing.T) {
 	}}
 	a := conversationAgent(t, m)
 	for _, tt := range []struct{ user, code string }{{"alice", "ok"}, {"bob", "not_found"}} {
-		ctx := functions.WithUser(context.Background(), define.User{ID: tt.user})
+		ctx := common.WithUser(context.Background(), define.User{ID: tt.user})
 		result, err := a.RunMessages(ctx, []*schema.Message{schema.UserMessage("查询 A100")}, func(Event) error { return nil })
 		if err != nil || len(result.Messages) != 3 {
 			t.Fatalf("user=%s result=%+v err=%v", tt.user, result, err)

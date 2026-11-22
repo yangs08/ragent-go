@@ -7,13 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type HealthController struct{}
+var Health = new(healthController)
 
-func (HealthController) Check(c *gin.Context) {
+type healthController struct{}
+
+func (*healthController) Check(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
 	_ = json.NewEncoder(c.Writer).Encode(map[string]string{"status": "ok"})
 }
-func (HealthController) Head(c *gin.Context) {
+func (*healthController) Head(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
 	c.Status(http.StatusOK)
 }

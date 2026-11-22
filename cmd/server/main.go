@@ -38,17 +38,18 @@ func runServer(ctx context.Context) error {
 	}
 	defer cleanup()
 	if bootstrap.DB != nil {
-		service.Auth, err = service.NewAuthService(ctx)
+		initCtx, cancel := context.WithTimeout(ctx, bootstrap.Config.Database.ConnectTimeout)
+		err := service.Auth.Init(initCtx)
+		cancel()
 		if err != nil {
 			return err
 		}
 	}
-	defer func() { service.Auth = nil }()
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
 	r.RedirectTrailingSlash = false
 	_ = r.SetTrustedProxies(nil)
-	r.Use(middleware.RequestLog(), middleware.Recovery())
+	r.Use(middleware.RequestLog(), middleware.Recovery(), middleware.RequestTimeout())
 	app.RegisterRoutes(r)
 	listener, err := net.Listen("tcp", bootstrap.Config.Server.HTTPAddr)
 	if err != nil {

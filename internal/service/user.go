@@ -4,36 +4,26 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 
-	"ragent-go/internal/bootstrap"
+	"ragent-go/internal/dao"
 	"ragent-go/internal/define"
-	"ragent-go/internal/model"
 )
 
-type UserService struct{}
+var User = new(userService)
 
-// Create is an operator capability, not a public registration endpoint.
-func (UserService) Create(ctx context.Context, username, password string) (string, error) {
-	if bootstrap.DB == nil {
-		return "", define.ServerError("账号服务暂不可用", "create user", errors.New("database unavailable"))
-	}
-	if !usernamePattern.MatchString(username) || len(password) < 12 || len(password) > 72 || strings.TrimSpace(password) == "" {
-		return "", define.ClientError("用户名须为 3..64 位字母数字及 _.-；密码须为 12..72 字节且非全空白")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+type userService struct{}
+
+// Create 接收已通过入口参数校验的入参；仅供管理员创建账号。
+func (s *userService) Create(ctx context.Context, request define.CreateUserRequest) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", define.ServerError("账号服务暂不可用", "hash password", err)
 	}
-	ctx, cancel := context.WithTimeout(ctx, bootstrap.Config.Auth.RequestTimeout)
-	defer cancel()
-	user := model.User{ID: rand.Text(), Username: username, PasswordHash: string(hash)}
-	if err := user.Model(ctx).Create(&user).Error; err != nil {
-		var pg *pgconn.PgError
-		if errors.As(err, &pg) && pg.Code == "23505" {
+	user := dao.UserStruct{ID: rand.Text(), Username: request.Username, PasswordHash: string(hash)}
+	if err := dao.User.Create(ctx, &user); err != nil {
+		if errors.Is(err, dao.ErrConflict) {
 			return "", define.ClientError("用户名已存在")
 		}
 		return "", define.ServerError("账号服务暂不可用", "create user", err)

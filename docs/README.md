@@ -4,7 +4,7 @@
 
 ## 从这里开始
 
-- [学习路线](ROADMAP.md)：核心专题与学习方法；当前结合 A01/A03/A04 落实多轮和增量执行。
+- [学习路线](ROADMAP.md)：核心专题与学习方法；当前结合 A01/A03/A04 落实多轮增量，并结合 A02/A05/A06 接入知识工具。
 - [当前架构](ARCHITECTURE.md)：真实目录、装配、身份、事务和执行边界。
 - [项目设计与能力地图](PROJECT.md)：长期项目范围；交付阶段不等于课程顺序。
 - [接口与 SSE 契约](api/README.md)：区分已实现接口与计划接口。
@@ -13,6 +13,8 @@
 ## 当前专题实践
 
 - [A01 多轮消息与增量输出](lessons/A01-agent-conversation-and-streaming.md)：已接入真实 Agent 和 CLI；完整消息历史、部分失败、用户上下文和进程取消验证见课文。
+
+- [A02 知识工具与 Agentic RAG](lessons/A02-knowledge-tool-and-agentic-rag.md)：Eino Retriever 返回带来源证据，与订单工具联合问答；目前使用固定演示语料。
 
 ## 已有课程记录
 

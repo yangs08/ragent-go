@@ -1,9 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
-	"io"
-	"mime"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,44 +10,40 @@ import (
 	"ragent-go/internal/service"
 )
 
-type AuthController struct{}
+var Auth = new(authController)
 
-func (a *AuthController) Login(c *gin.Context) {
-	media, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
-	if err != nil || media != "application/json" {
-		common.Fail(c, "需要 JSON 请求体")
-		return
-	}
+type authController struct{}
+
+func (a *authController) Login(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 	var request define.LoginRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 4096))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil {
-		common.Fail(c, "登录参数不合法")
+	if err := c.ShouldBindJSON(&request); err != nil {
+		common.OutputError(c, define.ClientError("请求参数不合法"))
 		return
 	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		common.Fail(c, "登录参数不合法")
+	if !define.UsernamePattern.MatchString(request.Username) {
+		common.OutputError(c, define.ClientError("用户名或密码错误"))
 		return
 	}
-	result, err := service.Auth.Login(c.Request.Context(), request.Username, request.Password)
+	result, err := service.Auth.Login(c.Request.Context(), request)
 	if err != nil {
-		common.Error(c, err)
+		common.OutputError(c, err)
 		return
 	}
-	common.Success(c, result)
+	common.OutputSuccess(c, result)
 }
-func (a *AuthController) Me(c *gin.Context) {
+func (a *authController) Me(c *gin.Context) {
 	user, err := common.RequireUser(c.Request.Context())
 	if err != nil {
-		common.Error(c, err)
+		common.OutputError(c, err)
 		return
 	}
-	common.Success(c, user)
+	common.OutputSuccess(c, user)
 }
-func (a *AuthController) Logout(c *gin.Context) {
+func (a *authController) Logout(c *gin.Context) {
 	if err := service.Auth.Logout(c.Request.Context(), c.GetHeader("Authorization")); err != nil {
-		common.Error(c, err)
+		common.OutputError(c, err)
 		return
 	}
-	common.Success(c, nil)
+	common.OutputSuccess(c, nil)
 }
