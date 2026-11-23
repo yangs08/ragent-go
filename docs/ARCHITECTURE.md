@@ -43,7 +43,7 @@ HTTP 请求时限集中到 Server.RequestTimeout，由 RequestTimeout 中间件�
 
 bootstrap.Boot(ctx) 加载配置并初始化 DB、Config、Logger；只在启动和关闭时写入。配置优先级为系统环境、.env、YAML、默认值，通过结构体标签装载，不逐业务维护转换表。基础资源在请求与后台工作退出后释放。
 
-进程级 Logger 直接使用 bootstrap.Logger；日志中间件在初始化时获取 Logger，不通过路由、Controller、响应器层层传递。Service 与中间件直接读取 bootstrap.Config.Auth；不另存 cfg，也不经路由传递。登录限流器只保留实例计数、互斥锁与清理时间，各实例预算独立；运行期间配置不可修改。
+进程级 Logger 直接使用 bootstrap.Logger；日志中间件在初始化时获取 Logger，不通过路由、Controller、响应器层层传递。Service 与中间件直接读取 bootstrap.Config.Auth；不另存 cfg，也不经路由传递。登录限流实现位于 middleware/login_limit.go：LoginLimit 负责读取客户端 IP 和输出拒绝响应，私有 allow(ip) 只管理令牌桶与清理状态。每个实例最多保存 1024 个 IP，每个补充周期最多清理一次，空闲超过两个周期的条目被回收；容量满时拒绝新 IP，已有 IP 继续按自身额度判断。各实例、各进程预算独立；运行期间配置不可修改。
 
 dao/user.go 和 session.go 同时定义完整表字段、显式列标签、TableName 和具体查询，不再另设 model 目录。普通调用通过 dao.User/dao.Session 使用 bootstrap.DB；Conn(ctx) 创建干净的 GORM 查询。事务内通过 dao.WithTx(ctx, tx) 生成局部 context 并传给各表操作；表入口无状态，不修改共享入口，不允许 nil 事务回退默认连接，连接与事务绑定统一复用 table[T]，不扩展通用 CRUD 或泛型仓储。每个 DAO 只检查自己负责的表。会话创建和过期判断统一使用数据库时钟。
 
